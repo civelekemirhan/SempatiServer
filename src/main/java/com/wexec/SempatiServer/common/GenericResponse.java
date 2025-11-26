@@ -22,7 +22,7 @@ public class GenericResponse<T> {
         return GenericResponse.<T>builder()
                 .code(httpStatus)
                 .payload(null)
-                .error(new ApiError(message, internalCode))
+                .error(new ApiError(message, internalCode,httpStatus))
                 .build();
     }
 }

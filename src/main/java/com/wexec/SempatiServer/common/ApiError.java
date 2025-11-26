@@ -9,4 +9,5 @@ import lombok.Data;
 public class ApiError {
     private String message;
     private String internalCode; // Hata takibi için kod (örn: AUTH_001)
+    private Integer errorCode;
 }
