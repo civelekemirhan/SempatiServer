@@ -1,19 +1,13 @@
 package com.wexec.SempatiServer.controller;
 
 import com.wexec.SempatiServer.common.GenericResponse;
-import com.wexec.SempatiServer.dto.AuthResponse;
-import com.wexec.SempatiServer.dto.ForgotPasswordRequest;
-import com.wexec.SempatiServer.dto.LoginRequest;
-import com.wexec.SempatiServer.dto.RegisterRequest;
-import com.wexec.SempatiServer.dto.ResetPasswordRequest;
-import com.wexec.SempatiServer.dto.VerifyCodeRequest;
+import com.wexec.SempatiServer.dto.*;
 import com.wexec.SempatiServer.service.AuthService;
 import com.wexec.SempatiServer.service.PasswordResetService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -55,9 +49,8 @@ public class AuthController {
 
     // 2. Adım
     @PostMapping("/verify-reset-code")
-    public GenericResponse<String> verifyResetCode(@RequestBody VerifyCodeRequest request) {
-        String resetToken = passwordResetService.verifyCode(request);
-        return GenericResponse.success(resetToken);
+    public GenericResponse<ForgotPasswordVerifyResponse> verifyResetCode(@RequestBody VerifyCodeRequest request) {
+        return GenericResponse.success(passwordResetService.verifyCode(request));
     }
 
     // 3. Adım
