@@ -19,7 +19,8 @@ import java.util.function.Function;
 public class JwtService {
 
     // application.properties dosyasına jwt.secret eklemeyi unutma!
-    // Örnek: jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    // Örnek:
+    // jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     @Value("${jwt.secret}")
     private String secretKey;
 
