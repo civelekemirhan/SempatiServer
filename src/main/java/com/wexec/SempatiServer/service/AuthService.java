@@ -147,6 +147,34 @@ public class AuthService {
     // -------------------------------------------------------------
 
     // -------------------------------------------------------------
+    // 4) REFRESH TOKEN (BURASI EKSİKTİ, EKLENDİ)
+    // -------------------------------------------------------------
+    public GenericResponse<AuthResponse> refreshToken(RefreshTokenRequest request) {
+        // 1. Token DB'de var mı?
+        RefreshToken tokenNode = refreshTokenRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new BusinessException("Refresh Token bulunamadı. Lütfen tekrar giriş yapın.",
+                        "REFRESH_NOT_FOUND"));
+
+        // 2. Süresi dolmuş mu?
+        if (tokenNode.getExpiryDate().isBefore(Instant.now())) {
+            refreshTokenRepository.delete(tokenNode); // Süresi dolanı temizle
+            throw new BusinessException("Oturum süresi dolmuş. Lütfen tekrar giriş yapın.", "REFRESH_EXPIRED");
+        }
+
+        // 3. Kullanıcıya yeni bir Access Token üret
+        User user = tokenNode.getUser();
+
+        // Bu işlem, bu kullanıcıya ait önceki tüm Access Token'ları (farklı cihazlarda
+        // olsa bile) geçersiz kılar.
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
+        String newAccessToken = jwtService.generateAccessToken(user);
+
+        // 4. Yeni Access Token'ı ve ESKİ (hala geçerli olan) Refresh Token'ı dön.
+        return GenericResponse.success(new AuthResponse(newAccessToken, request.getToken()));
+    }
+
+    // -------------------------------------------------------------
     // HELPER
     // -------------------------------------------------------------
     private GenericResponse<AuthResponse> generateTokensAndSave(User user) {
