@@ -1,5 +1,6 @@
 package com.wexec.SempatiServer.security;
 
+import com.wexec.SempatiServer.entity.User; // User entity importu önemli
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -18,9 +19,6 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    // application.properties dosyasına jwt.secret eklemeyi unutma!
-    // Örnek:
-    // jwt.secret=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     @Value("${jwt.secret}")
     private String secretKey;
 
@@ -33,12 +31,24 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
+    // --- GÜNCELLENDİ: Token üretirken versiyonu da ekle ---
+    public String generateAccessToken(User user) { // Parametreyi UserDetails yerine User yaptım
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("v", user.getTokenVersion()); // "v" anahtarıyla versiyonu gömüyoruz
+        return buildToken(claims, user, 1000 * 60 * 60); // 1 Saat
+    }
+
+    // Bu metod UserDetails aldığı için cast etmemiz gerekebilir, o yüzden User alan
+    // versiyonu kullanmak daha iyi
     public String generateAccessToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, 1000 * 60 * 60); // 1 Saat
+        if (userDetails instanceof User) {
+            return generateAccessToken((User) userDetails);
+        }
+        return buildToken(new HashMap<>(), userDetails, 1000 * 60 * 60);
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, 1000 * 60 * 60 * 24 * 7); // 7 Gün
+        return buildToken(new HashMap<>(), userDetails, 1000 * 60 * 60 * 24 * 30); // 30 Gün
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
@@ -51,9 +61,40 @@ public class JwtService {
                 .compact();
     }
 
+    // --- GÜNCELLENDİ: Versiyon Kontrolü ---
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+
+        // 1. Kullanıcı adı kontrolü
+        if (!username.equals(userDetails.getUsername())) {
+            return false;
+        }
+
+        // 2. Süre kontrolü
+        if (isTokenExpired(token)) {
+            return false;
+        }
+
+        // 3. Versiyon Kontrolü (Critical Part)
+        // Eğer kullanıcı User sınıfındansa versiyonu kontrol et
+        if (userDetails instanceof User) {
+            User user = (User) userDetails;
+            Long tokenVersion = extractClaim(token, claims -> {
+                // JWT numeric değerleri bazen Integer bazen Long dönebilir, güvenli dönüşüm:
+                Number v = claims.get("v", Number.class);
+                return v != null ? v.longValue() : null;
+            });
+
+            // Eğer tokenda versiyon yoksa (eski tokensa) veya versiyonlar eşleşmiyorsa
+            // GEÇERSİZDİR.
+            // Not: İlk kayıtta tokenVersion null olabilir, onu 0 kabul ediyoruz.
+            long currentVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0L;
+            long claimVersion = tokenVersion != null ? tokenVersion : 0L;
+
+            return currentVersion == claimVersion;
+        }
+
+        return true;
     }
 
     private boolean isTokenExpired(String token) {

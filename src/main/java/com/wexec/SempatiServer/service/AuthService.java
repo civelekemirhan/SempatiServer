@@ -163,6 +163,11 @@ public class AuthService {
 
         // 3. Kullanıcıya yeni bir Access Token üret
         User user = tokenNode.getUser();
+
+        // Bu işlem, bu kullanıcıya ait önceki tüm Access Token'ları (farklı cihazlarda
+        // olsa bile) geçersiz kılar.
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
         String newAccessToken = jwtService.generateAccessToken(user);
 
         // 4. Yeni Access Token'ı ve ESKİ (hala geçerli olan) Refresh Token'ı dön.
