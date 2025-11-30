@@ -1,6 +1,5 @@
 package com.wexec.SempatiServer.security;
 
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,40 +27,48 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
+
+        String path = request.getServletPath();
+
+        // Şifre sıfırlama ve Auth endpointleri halka açıktır, JWT kontrolü yapmadan
+        // geç.
+        if (path.contains("/api/v1/auth")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
 
-        // Header kontrolü: Bearer ile mi başlıyor?
+        // Authorization header yoksa veya Bearer ile başlamıyorsa devam et
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7); // "Bearer " kısmını at
-        userEmail = jwtService.extractUsername(jwt); // Token içinden maili çek
+        final String jwt = authHeader.substring(7);
 
-        // Mail var ama henüz sisteme authenticate olmamışsa
+        // --- DEĞİŞİKLİK BURADA ---
+        // isPasswordResetToken kontrolünü SİLDİK.
+        // Çünkü artık reset token header'da gelmiyor ve bir JWT değil.
+
+        final String userEmail = jwtService.extractUsername(jwt);
+
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-            // Token geçerli mi?
+            UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+
             if (jwtService.isTokenValid(jwt, userDetails)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
+                        userDetails, null, userDetails.getAuthorities());
+
                 authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-                // Sistemi bilgilendir: "Bu kullanıcı geçerlidir"
+                        new WebAuthenticationDetailsSource().buildDetails(request));
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
+
         filterChain.doFilter(request, response);
     }
 }

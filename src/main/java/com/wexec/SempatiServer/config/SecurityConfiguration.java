@@ -1,10 +1,11 @@
 package com.wexec.SempatiServer.config;
 
-
 import com.wexec.SempatiServer.security.JwtAuthenticationFilter;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -18,34 +19,47 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfiguration {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
-    private final AuthenticationProvider authenticationProvider;
+        private final JwtAuthenticationFilter jwtAuthFilter;
+        private final AuthenticationProvider authenticationProvider;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configure(http))
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/v1/auth/**",
-                                "/v2/api-docs",
-                                "/v3/api-docs",
-                                "/v3/api-docs/**",
-                                "/swagger-resources",
-                                "/swagger-resources/**",
-                                "/configuration/ui",
-                                "/configuration/security",
-                                "/swagger-ui/**",
-                                "/webjars/**",
-                                "/swagger-ui.html"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
-                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                http
+                                .cors(cors -> cors.configure(http))
+                                .csrf(AbstractHttpConfigurer::disable)
+                                .authorizeHttpRequests(auth -> auth
 
-        return http.build();
-    }
+                                                // Şifre sıfırlama akışının TAMAMI serbest
+                                                .requestMatchers(
+                                                                "/api/v1/auth/forgot-password",
+                                                                "/api/v1/auth/verify-reset-code",
+                                                                "/api/v1/auth/reset-password")
+                                                .permitAll()
+
+                                                // Auth işlemleri de serbest
+                                                .requestMatchers(
+                                                                "/api/v1/auth/register",
+                                                                "/api/v1/auth/login",
+                                                                "/api/v1/auth/verify")
+                                                .permitAll()
+
+                                                // Swagger tamamen serbest
+                                                .requestMatchers(
+                                                                "/v2/api-docs",
+                                                                "/v3/api-docs",
+                                                                "/v3/api-docs/**",
+                                                                "/swagger-resources/**",
+                                                                "/swagger-ui/**",
+                                                                "/webjars/**",
+                                                                "/swagger-ui.html")
+                                                .permitAll()
+
+                                                // Geri kalan her şey güvenlik ister
+                                                .anyRequest().authenticated())
+                                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authenticationProvider(authenticationProvider)
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+                return http.build();
+        }
 }
