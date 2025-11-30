@@ -38,6 +38,11 @@ public class AuthController {
         return authService.login(request);
     }
 
+    @PostMapping("/refresh-token")
+    public GenericResponse<AuthResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
+        return authService.refreshToken(request);
+    }
+
     // --- YENİ ŞİFRE SIFIRLAMA AKIŞI (SecurityConfig ile uyumlu isimler) ---
 
     // 1. Adım

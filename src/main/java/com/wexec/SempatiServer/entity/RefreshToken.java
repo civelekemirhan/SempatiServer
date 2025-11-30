@@ -19,6 +19,7 @@ public class RefreshToken {
     @Column(unique = true, nullable = false)
     private String token;
 
+    @Column(nullable = false)
     private Instant expiryDate;
 
     private boolean revoked; // Token iptal edildi mi? (Logout için)
