@@ -1,6 +1,7 @@
 package com.wexec.SempatiServer.service;
 
 import com.wexec.SempatiServer.common.BusinessException; // Projendeki exception sınıfı
+import com.wexec.SempatiServer.dto.ForgotPasswordVerifyResponse;
 import com.wexec.SempatiServer.entity.User;
 import com.wexec.SempatiServer.entity.VerificationCode;
 import com.wexec.SempatiServer.repository.UserRepository;
@@ -53,14 +54,13 @@ public class PasswordResetService {
 
     // 2. ADIM: Kodu Doğrula ve Reset Token Üret
     @Transactional
-    public String verifyCode(VerifyCodeRequest request) {
+    public ForgotPasswordVerifyResponse verifyCode(VerifyCodeRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BusinessException("Kullanıcı bulunamadı.", "USER_NOT_FOUND"));
 
-        // Kullanıcının kod kaydını bul
         VerificationCode vCode = codeRepository.findByUserAndUsedFalse(user)
                 .orElseThrow(() -> new BusinessException(
-                        "Geçerli bir doğrulama kodu bulunamadı. Lütfen yeni kod isteyin.", "CODE_NOT_FOUND"));
+                        "Geçerli bir doğrulama kodu bulunamadı.", "CODE_NOT_FOUND"));
 
         if (vCode.isExpired()) {
             throw new BusinessException("Doğrulama kodunun süresi dolmuş.", "CODE_EXPIRED");
@@ -70,14 +70,16 @@ public class PasswordResetService {
             throw new BusinessException("Girdiğiniz kod hatalı.", "INVALID_CODE");
         }
 
-        // Kod doğru. Token üret.
+        // Token üret
         String resetToken = UUID.randomUUID().toString();
         vCode.setResetToken(resetToken);
-        vCode.setUsed(true); // Kod kullanıldı işaretle
-
+        vCode.setUsed(true);
         codeRepository.save(vCode);
 
-        return resetToken;
+        // DTO'yu burada oluşturup dönüyoruz (Controller rahatlasın)
+        return ForgotPasswordVerifyResponse.builder()
+                .resetToken(resetToken)
+                .build();
     }
 
     // 3. ADIM: Şifreyi Güncelle
