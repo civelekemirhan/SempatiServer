@@ -25,7 +25,7 @@ public class UserService {
                 .id(currentUser.getId())
                 .email(currentUser.getEmail())
                 .nickname(currentUser.getNickname())
-                .phoneNumber(currentUser.getPhoneNumber())
+                .gender(currentUser.getGender())
                 .build();
 
         return GenericResponse.success(response);
