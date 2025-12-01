@@ -1,6 +1,7 @@
 package com.wexec.SempatiServer.service;
 
-import com.wexec.SempatiServer.common.BusinessException; // Hata fırlatmak için
+import com.wexec.SempatiServer.common.BusinessException;
+import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.CommentRequest;
 import com.wexec.SempatiServer.dto.PagedResponse;
@@ -34,9 +35,9 @@ public class PostService {
     private final CommentRepository commentRepository;
     private final PostLikeRepository postLikeRepository;
     private final S3Service s3Service;
-    private final ImageAnalysisService imageAnalysisService; // <-- YENİ: AI Servisi Eklendi
+    private final ImageAnalysisService imageAnalysisService;
 
-    // --- Post Oluşturma (YENİ MANTIK: Önce AI, Sonra S3) ---
+    // --- Post Oluşturma ---
     @Transactional
     public GenericResponse<Post> createPost(PostRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -47,12 +48,12 @@ public class PostService {
             for (MultipartFile file : request.getImages()) {
                 if (!file.isEmpty()) {
 
-                    // 1. ÖNCE YAPAY ZEKA KONTROLÜ YAP
-                    // Eğer kedi/köpek değilse burada hata fırlatır, kod aşağı inmez.
-                    // Böylece boşuna S3'e çöp yüklememiş oluruz.
+                    // 1. YAPAY ZEKA KONTROLÜ
+                    // Hata olursa imageAnalysisService içinde BusinessException fırlatılır
+                    // ve işlem burada kesilir. (GlobalHandler yakalar)
                     imageAnalysisService.validateImageContent(file);
 
-                    // 2. ONAYLANDIYSA S3'E YÜKLE
+                    // 2. S3 YÜKLEME
                     String url = s3Service.uploadFile(file);
                     mediaUrls.add(url);
                 }
@@ -78,8 +79,9 @@ public class PostService {
     public GenericResponse<Comment> addComment(Long postId, CommentRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
+        // DEĞİŞİKLİK: RuntimeException yerine BusinessException
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post bulunamadı!"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         Comment comment = Comment.builder()
                 .text(request.getText())
@@ -98,7 +100,7 @@ public class PostService {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post bulunamadı!"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         Optional<PostLike> existingLike = postLikeRepository.findByUserIdAndPostId(user.getId(), postId);
 
@@ -134,13 +136,14 @@ public class PostService {
     }
 
     // 3. Yakındaki Postlar (Konum)
-    public GenericResponse<PagedResponse<Post>> getNearbyPosts(double lat, double lon, double distanceKm, int page, int size) {
+    public GenericResponse<PagedResponse<Post>> getNearbyPosts(double lat, double lon, double distanceKm, int page,
+            int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> postsPage = postRepository.findNearbyPosts(lat, lon, distanceKm, pageable);
         return GenericResponse.success(mapToPagedResponse(postsPage));
     }
 
-    // --- Yardımcı Metod: Page objesini bizim temiz DTO'ya çevirir ---
+    // --- Yardımcı Metod ---
     private <T> PagedResponse<T> mapToPagedResponse(Page<T> page) {
         return PagedResponse.<T>builder()
                 .content(page.getContent())

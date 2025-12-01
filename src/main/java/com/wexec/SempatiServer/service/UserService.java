@@ -1,5 +1,7 @@
 package com.wexec.SempatiServer.service;
 
+import com.wexec.SempatiServer.common.BusinessException;
+import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
 import com.wexec.SempatiServer.entity.User;
@@ -15,11 +17,10 @@ public class UserService {
     private final UserRepository userRepository;
 
     public GenericResponse<UserProfileResponse> getMyProfile() {
-        // O an token ile giriş yapmış kullanıcıyı al
-        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        // Güncel veriyi DB'den çekmek her zaman daha güvenlidir
-        User currentUser = userRepository.findById(user.getId()).orElseThrow();
+        // O an token ile giriş yapmış kullanıcıyı SecurityContext'ten al
+        User principal = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         UserProfileResponse response = UserProfileResponse.builder()
                 .id(currentUser.getId())
