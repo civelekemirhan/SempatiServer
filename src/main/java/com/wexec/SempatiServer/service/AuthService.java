@@ -56,10 +56,11 @@ public class AuthService {
             // Kayıt olmuş ama doğrulamamış kullanıcı için yeni kod
             String newCode = String.valueOf(new Random().nextInt(900000) + 100000);
 
-            existingUser.setNickname(request.getNickname());
-            existingUser.setPhoneNumber(request.getPhoneNumber());
-            existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
-            userRepository.save(existingUser);
+                // Kullanıcı bilgilerini güncelle (Belki şifresini yanlış yazmıştı, düzeltti)
+                existingUser.setNickname(request.getNickname());
+                existingUser.setGender(request.getGender());
+                existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+                userRepository.save(existingUser);
 
             VerificationToken token = verificationTokenRepository.findByUser(existingUser)
                     .orElse(VerificationToken.builder().user(existingUser).build());
@@ -76,7 +77,7 @@ public class AuthService {
         // Yeni Kullanıcı
         User user = User.builder()
                 .email(request.getEmail())
-                .phoneNumber(request.getPhoneNumber())
+                .gender(request.getGender())
                 .nickname(request.getNickname())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.USER)
