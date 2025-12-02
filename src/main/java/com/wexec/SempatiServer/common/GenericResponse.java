@@ -6,10 +6,13 @@ import lombok.Data;
 @Data
 @Builder
 public class GenericResponse<T> {
-    private int code;       // HTTP Status (200, 400 vs.)
-    private T payload;      // Başarılıysa veri buraya
+
+    // İSTEDİĞİN SADE YAPI
+    private int code; // HTTP Status (200, 400 vs.)
+    private T payload; // Başarılıysa veri buraya (Eski adı: data)
     private ApiError error; // Hataysa detay buraya
 
+    // Başarılı Cevap Metodu
     public static <T> GenericResponse<T> success(T payload) {
         return GenericResponse.<T>builder()
                 .code(200)
@@ -18,11 +21,12 @@ public class GenericResponse<T> {
                 .build();
     }
 
-    public static <T> GenericResponse<T> error(int httpStatus, String message, String internalCode) {
+    // Hata Cevap Metodu
+    public static <T> GenericResponse<T> error(int httpStatus, ApiError error) {
         return GenericResponse.<T>builder()
                 .code(httpStatus)
                 .payload(null)
-                .error(new ApiError(message, internalCode,httpStatus))
+                .error(error)
                 .build();
     }
 }

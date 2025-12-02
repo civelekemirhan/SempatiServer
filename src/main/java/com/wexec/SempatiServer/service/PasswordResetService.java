@@ -1,6 +1,7 @@
 package com.wexec.SempatiServer.service;
 
-import com.wexec.SempatiServer.common.BusinessException; // Projendeki exception sınıfı
+import com.wexec.SempatiServer.common.BusinessException;
+import com.wexec.SempatiServer.common.ErrorCode; // <--- YENİ IMPORT
 import com.wexec.SempatiServer.dto.ForgotPasswordVerifyResponse;
 import com.wexec.SempatiServer.entity.User;
 import com.wexec.SempatiServer.entity.VerificationCode;
@@ -9,13 +10,13 @@ import com.wexec.SempatiServer.repository.VerificationCodeRepository;
 import com.wexec.SempatiServer.dto.ForgotPasswordRequest;
 import com.wexec.SempatiServer.dto.VerifyCodeRequest;
 import com.wexec.SempatiServer.dto.ResetPasswordRequest;
-import com.wexec.SempatiServer.service.EmailService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.UUID;
 
@@ -32,18 +33,16 @@ public class PasswordResetService {
     @Transactional
     public void initiatePasswordReset(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.",
-                        "USER_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         String code = String.format("%06d", new Random().nextInt(999999));
 
-        // Varsa güncelle, yoksa yeni oluştur (Unique Constraint hatasını önler)
         VerificationCode verificationCode = codeRepository.findByUser(user)
                 .orElse(new VerificationCode());
 
         verificationCode.setUser(user);
         verificationCode.setCode(code);
-        verificationCode.setExpiryDate(java.time.LocalDateTime.now().plusMinutes(2));
+        verificationCode.setExpiryDate(LocalDateTime.now().plusMinutes(2));
         verificationCode.setUsed(false);
         verificationCode.setResetToken(null);
 
@@ -56,27 +55,24 @@ public class PasswordResetService {
     @Transactional
     public ForgotPasswordVerifyResponse verifyCode(VerifyCodeRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("Kullanıcı bulunamadı.", "USER_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         VerificationCode vCode = codeRepository.findByUserAndUsedFalse(user)
-                .orElseThrow(() -> new BusinessException(
-                        "Geçerli bir doğrulama kodu bulunamadı.", "CODE_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESET_CODE_NOT_FOUND));
 
         if (vCode.isExpired()) {
-            throw new BusinessException("Doğrulama kodunun süresi dolmuş.", "CODE_EXPIRED");
+            throw new BusinessException(ErrorCode.RESET_CODE_EXPIRED);
         }
 
         if (!vCode.getCode().equals(request.getCode())) {
-            throw new BusinessException("Girdiğiniz kod hatalı.", "INVALID_CODE");
+            throw new BusinessException(ErrorCode.RESET_INVALID_CODE);
         }
 
-        // Token üret
         String resetToken = UUID.randomUUID().toString();
         vCode.setResetToken(resetToken);
         vCode.setUsed(true);
         codeRepository.save(vCode);
 
-        // DTO'yu burada oluşturup dönüyoruz (Controller rahatlasın)
         return ForgotPasswordVerifyResponse.builder()
                 .resetToken(resetToken)
                 .build();
@@ -86,10 +82,10 @@ public class PasswordResetService {
     @Transactional
     public void updatePassword(ResetPasswordRequest request) {
         VerificationCode vCode = codeRepository.findByResetToken(request.getResetToken())
-                .orElseThrow(() -> new BusinessException("Geçersiz veya süresi dolmuş işlem.", "INVALID_TOKEN"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESET_INVALID_TOKEN));
 
         if (vCode.isExpired()) {
-            throw new BusinessException("İşlem zaman aşımına uğradı. Lütfen tekrar kod isteyin.", "TOKEN_EXPIRED");
+            throw new BusinessException(ErrorCode.RESET_TOKEN_EXPIRED);
         }
 
         User user = vCode.getUser();

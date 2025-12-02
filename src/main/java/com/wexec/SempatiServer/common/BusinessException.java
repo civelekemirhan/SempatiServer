@@ -5,21 +5,16 @@ import lombok.Getter;
 @Getter
 public class BusinessException extends RuntimeException {
 
-    //HATA YÖNETİMİ DAHA İYİ YAPILABİLİR
+    private final ErrorCode errorCode;
 
-    private final String internalCode; // Örn: AUTH_001
-    private final int httpStatus;      // Örn: 400, 404
-
-    public BusinessException(String message, String internalCode, int httpStatus) {
-        super(message);
-        this.internalCode = internalCode;
-        this.httpStatus = httpStatus;
+    public BusinessException(ErrorCode errorCode) {
+        super(errorCode.getMessage());
+        this.errorCode = errorCode;
     }
 
-    // Hızlı kullanım için (Default 400 döner)
-    public BusinessException(String message, String internalCode) {
-        super(message);
-        this.internalCode = internalCode;
-        this.httpStatus = 400;
+    // Nadiren özel mesaj geçmek istersen diye (Overloading)
+    public BusinessException(ErrorCode errorCode, String customMessage) {
+        super(customMessage);
+        this.errorCode = errorCode;
     }
 }

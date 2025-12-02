@@ -1,6 +1,5 @@
 package com.wexec.SempatiServer.entity; // Düzeltildi
 
-import com.wexec.SempatiServer.entity.User; // User sınıfının doğru yeri
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;

@@ -18,14 +18,11 @@ public class PostController {
 
     private final PostService postService;
 
-    // 1. Post Oluşturma (Aynen Kaldı)
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public GenericResponse<Post> createPost(@ModelAttribute PostRequest request) {
         return postService.createPost(request);
     }
 
-    // 2. Tüm Postları Listeleme (Feed Akışı - GÜNCELLENDİ)
-    // Artık sayfa ve boyut alıyor. Örn: ?page=0&size=10
     @GetMapping
     public GenericResponse<PagedResponse<Post>> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
@@ -33,8 +30,6 @@ public class PostController {
         return postService.getAllPosts(page, size);
     }
 
-    // 3. Yakınlardaki Postlar (Konum - GÜNCELLENDİ)
-    // Hem konum hem sayfalama alıyor.
     @GetMapping("/nearby")
     public GenericResponse<PagedResponse<Post>> getNearbyPosts(
             @RequestParam double lat,
@@ -45,8 +40,6 @@ public class PostController {
         return postService.getNearbyPosts(lat, lon, dist, page, size);
     }
 
-    // 4. Bir Kullanıcının Postları (Profil - YENİ EKLENDİ)
-    // Başkasının profiline girince onun postlarını sayfalayarak getirir.
     @GetMapping("/user/{userId}")
     public GenericResponse<PagedResponse<Post>> getUserPosts(
             @PathVariable Long userId,
@@ -55,7 +48,6 @@ public class PostController {
         return postService.getUserPosts(userId, page, size);
     }
 
-    // 5. Yorum Yapma (Aynen Kaldı)
     @PostMapping("/{postId}/comments")
     public GenericResponse<Comment> addComment(
             @PathVariable Long postId,
@@ -63,7 +55,6 @@ public class PostController {
         return postService.addComment(postId, request);
     }
 
-    // 6. Beğen / Vazgeç (Aynen Kaldı)
     @PostMapping("/{postId}/like")
     public GenericResponse<String> toggleLike(@PathVariable Long postId) {
         return postService.toggleLike(postId);

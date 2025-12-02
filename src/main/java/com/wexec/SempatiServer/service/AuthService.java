@@ -1,6 +1,7 @@
 package com.wexec.SempatiServer.service;
 
 import com.wexec.SempatiServer.common.BusinessException;
+import com.wexec.SempatiServer.common.ErrorCode; // <--- ENUM IMPORTU ÖNEMLİ
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.*;
 import com.wexec.SempatiServer.entity.*;
@@ -21,13 +22,12 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null") // <--- IDE'nin gereksiz "Null safety" uyarılarını susturur
 public class AuthService {
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    // private final PasswordResetTokenRepository passwordResetTokenRepository; //
-    // SİLDİK: Artık kullanılmıyor
 
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -41,7 +41,7 @@ public class AuthService {
     public GenericResponse<String> register(RegisterRequest request) {
 
         if (!request.getPassword().equals(request.getConfirmPassword())) {
-            throw new BusinessException("Şifreler eşleşmiyor.", "AUTH_PASS_MISMATCH");
+            throw new BusinessException(ErrorCode.AUTH_PASSWORD_MISMATCH);
         }
 
         Optional<User> existingUserOpt = userRepository.findByEmail(request.getEmail());
@@ -50,17 +50,17 @@ public class AuthService {
             User existingUser = existingUserOpt.get();
 
             if (existingUser.isEnabled()) {
-                throw new BusinessException("Bu e-posta adresi zaten kullanımda.", "AUTH_EMAIL_EXISTS");
+                throw new BusinessException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
             }
 
             // Kayıt olmuş ama doğrulamamış kullanıcı için yeni kod
             String newCode = String.valueOf(new Random().nextInt(900000) + 100000);
 
-                // Kullanıcı bilgilerini güncelle (Belki şifresini yanlış yazmıştı, düzeltti)
-                existingUser.setNickname(request.getNickname());
-                existingUser.setGender(request.getGender());
-                existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
-                userRepository.save(existingUser);
+            // Kullanıcı bilgilerini güncelle (PhoneNumber YOK)
+            existingUser.setNickname(request.getNickname());
+            existingUser.setGender(request.getGender());
+            existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(existingUser);
 
             VerificationToken token = verificationTokenRepository.findByUser(existingUser)
                     .orElse(VerificationToken.builder().user(existingUser).build());
@@ -74,7 +74,7 @@ public class AuthService {
             return GenericResponse.success("Önceki kayıt doğrulanmamıştı. Yeni doğrulama kodu gönderildi.");
         }
 
-        // Yeni Kullanıcı
+        // Yeni Kullanıcı (PhoneNumber YOK)
         User user = User.builder()
                 .email(request.getEmail())
                 .gender(request.getGender())
@@ -100,23 +100,23 @@ public class AuthService {
     }
 
     // -------------------------------------------------------------
-    // 2) EMAIL VERIFY (Kayıt Olma Doğrulaması)
+    // 2) EMAIL VERIFY
     // -------------------------------------------------------------
     @Transactional
     public GenericResponse<AuthResponse> verify(String email, String code) {
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         VerificationToken verificationToken = verificationTokenRepository.findByUser(user)
-                .orElseThrow(() -> new RuntimeException("Doğrulama kodu bulunamadı"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_INVALID_TOKEN));
 
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            return GenericResponse.error(400, "Kodun süresi dolmuş.", "AUTH_003");
+            throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
         }
 
         if (!verificationToken.getToken().equals(code)) {
-            return GenericResponse.error(400, "Hatalı kod.", "AUTH_004");
+            throw new BusinessException(ErrorCode.AUTH_INVALID_TOKEN);
         }
 
         user.setEnabled(true);
@@ -131,47 +131,39 @@ public class AuthService {
     // 3) LOGIN
     // -------------------------------------------------------------
     public GenericResponse<AuthResponse> login(LoginRequest request) {
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-        } catch (Exception e) {
-            return GenericResponse.error(401, "Hatalı giriş bilgileri.", "AUTH_005");
-        }
+        // Hata kontrolünü Spring Security'ye bıraktık (GlobalHandler yakalayacak)
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
         return generateTokensAndSave(user);
     }
 
     // -------------------------------------------------------------
-    // NOT: Şifre Sıfırlama metodları buradan SİLİNDİ.
-    // O işlemler artık "PasswordResetService" içinde yapılıyor.
-    // -------------------------------------------------------------
-
-    // -------------------------------------------------------------
-    // 4) REFRESH TOKEN (BURASI EKSİKTİ, EKLENDİ)
+    // 4) REFRESH TOKEN
     // -------------------------------------------------------------
     public GenericResponse<AuthResponse> refreshToken(RefreshTokenRequest request) {
         // 1. Token DB'de var mı?
         RefreshToken tokenNode = refreshTokenRepository.findByToken(request.getToken())
-                .orElseThrow(() -> new BusinessException("Refresh Token bulunamadı. Lütfen tekrar giriş yapın.",
-                        "REFRESH_NOT_FOUND"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_NOT_FOUND));
 
         // 2. Süresi dolmuş mu?
         if (tokenNode.getExpiryDate().isBefore(Instant.now())) {
-            refreshTokenRepository.delete(tokenNode); // Süresi dolanı temizle
-            throw new BusinessException("Oturum süresi dolmuş. Lütfen tekrar giriş yapın.", "REFRESH_EXPIRED");
+            refreshTokenRepository.delete(tokenNode); // Temizlik
+            throw new BusinessException(ErrorCode.REFRESH_EXPIRED);
         }
 
         // 3. Kullanıcıya yeni bir Access Token üret
         User user = tokenNode.getUser();
 
-        // Bu işlem, bu kullanıcıya ait önceki tüm Access Token'ları (farklı cihazlarda
-        // olsa bile) geçersiz kılar.
+        // Güvenlik: Token versiyonunu artır
         user.setTokenVersion(user.getTokenVersion() + 1);
         userRepository.save(user);
+
         String newAccessToken = jwtService.generateAccessToken(user);
 
-        // 4. Yeni Access Token'ı ve ESKİ (hala geçerli olan) Refresh Token'ı dön.
         return GenericResponse.success(new AuthResponse(newAccessToken, request.getToken()));
     }
 
@@ -184,10 +176,13 @@ public class AuthService {
 
         String refreshTokenStr = UUID.randomUUID().toString();
 
+        Optional<RefreshToken> oldToken = refreshTokenRepository.findByUser(user);
+        oldToken.ifPresent(refreshTokenRepository::delete);
+
         RefreshToken refreshToken = RefreshToken.builder()
                 .token(refreshTokenStr)
                 .user(user)
-                .expiryDate(Instant.now().plusMillis(1000L * 60 * 60 * 24 * 30))
+                .expiryDate(Instant.now().plusMillis(1000L * 60 * 60 * 24 * 30)) // 30 Gün
                 .revoked(false)
                 .build();
 
@@ -195,5 +190,4 @@ public class AuthService {
 
         return GenericResponse.success(new AuthResponse(accessToken, refreshTokenStr));
     }
-
 }
