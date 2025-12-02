@@ -18,16 +18,17 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null") // IDE'nin JPA ve Lombok ile ilgili gereksiz null uyarılarını susturur
 public class ChatService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final S3Service s3Service;
 
-    @Transactional // Veritabanı işlemi olduğu için transactional ekledik
-    public void saveAndSendMessage(Long senderId, ChatMessageRequest request) {
+    @Transactional
+    public ChatMessage saveAndSendMessage(Long senderId, ChatMessageRequest request) {
 
-        // Yeni Hata Yönetimi: Boş mesaj kontrolü
+        // Validasyon
         if (request.getContent() == null || request.getContent().trim().isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Mesaj içeriği boş olamaz.");
         }
@@ -43,47 +44,41 @@ public class ChatService {
                 .timestamp(LocalDateTime.now())
                 .build();
 
-        chatMessageRepository.save(message);
+        // Mesajı kaydet ve kaydedilen (ID atanmış) halini al
+        ChatMessage savedMessage = chatMessageRepository.save(message);
 
         // WebSocket üzerinden alıcıya gönder
+        // convertAndSendToUser(user, destination, payload)
         messagingTemplate.convertAndSendToUser(
                 String.valueOf(request.getRecipientId()),
                 "/queue/messages",
-                message);
+                savedMessage);
+
+        return savedMessage;
     }
 
     @Transactional
     public GenericResponse<ChatMessage> uploadAndSendMedia(Long senderId, Long recipientId, MultipartFile file,
             MessageType type) {
 
-        // Yeni Hata Yönetimi: Boş dosya kontrolü
+        // Dosya kontrolü
         if (file.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Gönderilecek dosya boş olamaz.");
         }
 
-        // 1. Dosyayı AWS S3'e yükle (Hata olursa S3Service kendi içinde fırlatır,
-        // GlobalHandler yakalar)
+        // 1. S3 Yükleme
         String mediaUrl = s3Service.uploadFile(file);
 
-        // 2. Normal bir mesajmış gibi hazırla
+        // 2. Request Hazırla
         ChatMessageRequest request = new ChatMessageRequest();
         request.setRecipientId(recipientId);
-        request.setContent(mediaUrl);
+        request.setContent(mediaUrl); // İçerik olarak URL'i koyuyoruz
         request.setType(type);
 
-        // 3. Mesajı kaydet ve gönder
-        saveAndSendMessage(senderId, request);
+        // 3. Mesajı kaydet ve gönder (Artık metot bize mesajı geri dönüyor)
+        ChatMessage sentMessage = saveAndSendMessage(senderId, request);
 
-        // 4. Response dön (chatId ekledim ki tutarlı olsun)
-        ChatMessage sentMessage = ChatMessage.builder()
-                .chatId(getChatId(senderId, recipientId))
-                .senderId(senderId)
-                .recipientId(recipientId)
-                .content(mediaUrl)
-                .type(type)
-                .timestamp(LocalDateTime.now())
-                .build();
-
+        // 4. Response dön
         return GenericResponse.success(sentMessage);
     }
 

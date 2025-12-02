@@ -18,8 +18,24 @@ public class UserService {
 
     public GenericResponse<UserProfileResponse> getMyProfile() {
         // O an token ile giriş yapmış kullanıcıyı SecurityContext'ten al
-        User principal = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        User currentUser = userRepository.findById(principal.getId())
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        Long userId;
+        if (principal instanceof User) {
+            userId = ((User) principal).getId();
+        } else {
+            // Nadir durum: Principal User tipinde değilse (örn: String username)
+            throw new BusinessException(ErrorCode.AUTH_INVALID_TOKEN);
+        }
+
+        // Null Safety Check: ID null ise token geçersiz sayılır (IDE uyarısını çözer)
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.AUTH_INVALID_TOKEN);
+        }
+
+        // Veritabanından güncel halini çek.
+        // Eğer kullanıcı bulunamazsa (örn: silinmişse) BusinessException fırlat.
+        User currentUser = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         UserProfileResponse response = UserProfileResponse.builder()
@@ -29,6 +45,8 @@ public class UserService {
                 .gender(currentUser.getGender())
                 .build();
 
+        // GenericResponse yapısı değişti ama .success() metodu hala aynı imzaya sahip.
+        // Arka planda veriyi 'payload' alanına koyacak.
         return GenericResponse.success(response);
     }
 }

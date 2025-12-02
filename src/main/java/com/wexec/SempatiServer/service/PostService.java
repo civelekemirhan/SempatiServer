@@ -1,7 +1,7 @@
 package com.wexec.SempatiServer.service;
 
 import com.wexec.SempatiServer.common.BusinessException;
-import com.wexec.SempatiServer.common.ErrorCode;
+import com.wexec.SempatiServer.common.ErrorCode; // <--- ENUM IMPORTU
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.CommentRequest;
 import com.wexec.SempatiServer.dto.PagedResponse;
@@ -13,7 +13,7 @@ import com.wexec.SempatiServer.entity.User;
 import com.wexec.SempatiServer.repository.CommentRepository;
 import com.wexec.SempatiServer.repository.PostLikeRepository;
 import com.wexec.SempatiServer.repository.PostRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional; // jakarta.transaction.Transactional yerine bunu tercih et (Spring için)
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,6 +29,8 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null") // IDE'nin JPA dönüş tipleri için verdiği gereksiz "Null type safety"
+                          // uyarılarını susturur
 public class PostService {
 
     private final PostRepository postRepository;
@@ -46,11 +48,10 @@ public class PostService {
 
         if (request.getImages() != null) {
             for (MultipartFile file : request.getImages()) {
-                if (!file.isEmpty()) {
+                if (file != null && !file.isEmpty()) {
 
                     // 1. YAPAY ZEKA KONTROLÜ
                     // Hata olursa imageAnalysisService içinde BusinessException fırlatılır
-                    // ve işlem burada kesilir. (GlobalHandler yakalar)
                     imageAnalysisService.validateImageContent(file);
 
                     // 2. S3 YÜKLEME
@@ -71,15 +72,19 @@ public class PostService {
                 .user(user)
                 .build();
 
-        postRepository.save(post);
-        return GenericResponse.success(post);
+        Post savedPost = postRepository.save(post);
+        return GenericResponse.success(savedPost);
     }
 
     // --- Yorum Ekleme ---
     public GenericResponse<Comment> addComment(Long postId, CommentRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        // DEĞİŞİKLİK: RuntimeException yerine BusinessException
+        // Null check
+        if (postId == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Post ID boş olamaz.");
+        }
+
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
@@ -90,14 +95,19 @@ public class PostService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        commentRepository.save(comment);
-        return GenericResponse.success(comment);
+        Comment savedComment = commentRepository.save(comment);
+        return GenericResponse.success(savedComment);
     }
 
     // --- Beğeni (Like/Unlike) Mantığı ---
     @Transactional
     public GenericResponse<String> toggleLike(Long postId) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        // Null check
+        if (postId == null || user.getId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
@@ -130,6 +140,9 @@ public class PostService {
 
     // 2. Kullanıcı Profili (O kişinin postları)
     public GenericResponse<PagedResponse<Post>> getUserPosts(Long userId, int page, int size) {
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "User ID gereklidir.");
+        }
         Pageable pageable = PageRequest.of(page, size);
         Page<Post> postsPage = postRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
         return GenericResponse.success(mapToPagedResponse(postsPage));

@@ -1,7 +1,7 @@
 package com.wexec.SempatiServer.service;
 
 import com.wexec.SempatiServer.common.BusinessException;
-import com.wexec.SempatiServer.common.ErrorCode;
+import com.wexec.SempatiServer.common.ErrorCode; // <--- ENUM IMPORTU ÖNEMLİ
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.*;
 import com.wexec.SempatiServer.entity.*;
@@ -22,6 +22,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null") // <--- IDE'nin gereksiz "Null safety" uyarılarını susturur
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -33,6 +34,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
 
+    // -------------------------------------------------------------
+    // 1) REGISTER
+    // -------------------------------------------------------------
     @Transactional
     public GenericResponse<String> register(RegisterRequest request) {
 
@@ -49,8 +53,10 @@ public class AuthService {
                 throw new BusinessException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
             }
 
+            // Kayıt olmuş ama doğrulamamış kullanıcı için yeni kod
             String newCode = String.valueOf(new Random().nextInt(900000) + 100000);
 
+            // Kullanıcı bilgilerini güncelle (PhoneNumber YOK)
             existingUser.setNickname(request.getNickname());
             existingUser.setGender(request.getGender());
             existingUser.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -68,6 +74,7 @@ public class AuthService {
             return GenericResponse.success("Önceki kayıt doğrulanmamıştı. Yeni doğrulama kodu gönderildi.");
         }
 
+        // Yeni Kullanıcı (PhoneNumber YOK)
         User user = User.builder()
                 .email(request.getEmail())
                 .gender(request.getGender())
@@ -92,6 +99,9 @@ public class AuthService {
         return GenericResponse.success("Kayıt başarılı. Doğrulama kodu gönderildi.");
     }
 
+    // -------------------------------------------------------------
+    // 2) EMAIL VERIFY
+    // -------------------------------------------------------------
     @Transactional
     public GenericResponse<AuthResponse> verify(String email, String code) {
 
@@ -117,7 +127,11 @@ public class AuthService {
         return generateTokensAndSave(user);
     }
 
+    // -------------------------------------------------------------
+    // 3) LOGIN
+    // -------------------------------------------------------------
     public GenericResponse<AuthResponse> login(LoginRequest request) {
+        // Hata kontrolünü Spring Security'ye bıraktık (GlobalHandler yakalayacak)
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
@@ -127,18 +141,24 @@ public class AuthService {
         return generateTokensAndSave(user);
     }
 
+    // -------------------------------------------------------------
+    // 4) REFRESH TOKEN
+    // -------------------------------------------------------------
     public GenericResponse<AuthResponse> refreshToken(RefreshTokenRequest request) {
+        // 1. Token DB'de var mı?
         RefreshToken tokenNode = refreshTokenRepository.findByToken(request.getToken())
                 .orElseThrow(() -> new BusinessException(ErrorCode.REFRESH_NOT_FOUND));
 
+        // 2. Süresi dolmuş mu?
         if (tokenNode.getExpiryDate().isBefore(Instant.now())) {
             refreshTokenRepository.delete(tokenNode); // Temizlik
             throw new BusinessException(ErrorCode.REFRESH_EXPIRED);
         }
 
+        // 3. Kullanıcıya yeni bir Access Token üret
         User user = tokenNode.getUser();
 
-        // Güvenlik: Token versiyonunu artır (Eski access tokenları öldürür)
+        // Güvenlik: Token versiyonunu artır
         user.setTokenVersion(user.getTokenVersion() + 1);
         userRepository.save(user);
 
@@ -147,6 +167,9 @@ public class AuthService {
         return GenericResponse.success(new AuthResponse(newAccessToken, request.getToken()));
     }
 
+    // -------------------------------------------------------------
+    // HELPER
+    // -------------------------------------------------------------
     private GenericResponse<AuthResponse> generateTokensAndSave(User user) {
 
         String accessToken = jwtService.generateAccessToken(user);
