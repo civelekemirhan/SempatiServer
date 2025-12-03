@@ -1,7 +1,7 @@
 package com.wexec.SempatiServer.service;
 
 import com.wexec.SempatiServer.common.BusinessException;
-import com.wexec.SempatiServer.common.ErrorCode; // <--- ENUM IMPORTU
+import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.CommentRequest;
 import com.wexec.SempatiServer.dto.PagedResponse;
@@ -13,7 +13,7 @@ import com.wexec.SempatiServer.entity.User;
 import com.wexec.SempatiServer.repository.CommentRepository;
 import com.wexec.SempatiServer.repository.PostLikeRepository;
 import com.wexec.SempatiServer.repository.PostRepository;
-import org.springframework.transaction.annotation.Transactional; // jakarta.transaction.Transactional yerine bunu tercih et (Spring için)
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,8 +29,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@SuppressWarnings("null") // IDE'nin JPA dönüş tipleri için verdiği gereksiz "Null type safety"
-                          // uyarılarını susturur
+@SuppressWarnings("null")
 public class PostService {
 
     private final PostRepository postRepository;
@@ -132,12 +131,32 @@ public class PostService {
     // =================================================================
 
     // 1. Tüm Postlar (Feed Akışı)
-    public GenericResponse<PagedResponse<Post>> getAllPosts(int page, int size) {
+    // 1. Tüm Postlar (Feed Akışı)
+    @Transactional(readOnly = true)
+    public GenericResponse<PagedResponse<Post>> getAllPosts(int page, int size, List<Long> excludedPostIds) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Post> postsPage = postRepository.findAllByOrderByCreatedAtDesc(pageable);
+
+        // 1. İsteğin filtreli olup olmadığını belirle (Boş veya null ise filtre uygulanmamış demektir)
+        // Bu boolean, hata kontrolünde kullanılacak kritik bilgidir.
+        boolean isFilterApplied = excludedPostIds != null && !excludedPostIds.isEmpty();
+
+        // 2. SQL IN sorgusunun boş liste ile hata vermesini önlemek için 0L ekle
+        // Filtre uygulanmamışsa, (yani Page 0'dan istiyorsak), ID'si olmayan 0L eklenir.
+        if (!isFilterApplied) {
+            excludedPostIds = new ArrayList<>();
+            excludedPostIds.add(0L); // ID'si olmayan bir değeri ekle
+        }
+
+        // Postları karışık sırada getir ve daha önce görülenleri filtrele
+        Page<Post> postsPage = postRepository.findAllRandomly(excludedPostIds, pageable);
+
+        // 3. NİHAİ KONTROL: Eğer içerik boşsa VE filtremiz uygulanmışsa (yani post kalmamışsa)
+        if (!postsPage.hasContent() && isFilterApplied) {
+            throw new BusinessException(ErrorCode.NO_MORE_POSTS);
+        }
+
         return GenericResponse.success(mapToPagedResponse(postsPage));
     }
-
     // 2. Kullanıcı Profili (O kişinin postları)
     public GenericResponse<PagedResponse<Post>> getUserPosts(Long userId, int page, int size) {
         if (userId == null) {

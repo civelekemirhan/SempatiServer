@@ -21,6 +21,7 @@ public enum ErrorCode {
     EMAIL_SEND_ERROR("MAIL_001", "E-posta gönderimi başarısız oldu.", HttpStatus.INTERNAL_SERVER_ERROR),
 
     POST_NOT_FOUND("POST_001", "İlgili gönderi bulunamadı.", HttpStatus.NOT_FOUND),
+    NO_MORE_POSTS("POST_002", "Tüm gönderiler gösterildi.", HttpStatus.NOT_FOUND),
 
     REFRESH_NOT_FOUND("AUTH_007", "Refresh Token bulunamadı.", HttpStatus.UNAUTHORIZED),
     REFRESH_EXPIRED("AUTH_008", "Oturum süresi dolmuş, lütfen tekrar giriş yapın.", HttpStatus.UNAUTHORIZED),
