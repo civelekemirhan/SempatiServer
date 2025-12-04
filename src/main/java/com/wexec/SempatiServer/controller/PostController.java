@@ -8,6 +8,9 @@ import com.wexec.SempatiServer.entity.Comment;
 import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.service.PostService;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,8 +29,9 @@ public class PostController {
     @GetMapping
     public GenericResponse<PagedResponse<Post>> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return postService.getAllPosts(page, size);
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) List<Long> excludedPostIds) {
+        return postService.getAllPosts(page, size, excludedPostIds);
     }
 
     @GetMapping("/nearby")

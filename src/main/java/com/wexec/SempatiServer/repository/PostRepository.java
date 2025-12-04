@@ -12,16 +12,16 @@ import java.util.List;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-    // 1. Anasayfa Akışı (Tüm Postlar - Sayfalı)
-    // List yerine Page dönüyor, Pageable alıyor
-    Page<Post> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    // 1. Anasayfa Akışı (Karışık, Tekrarsız Sorgu)
+    @Query(value = "SELECT * FROM posts p WHERE p.id NOT IN :excludedPostIds ORDER BY RANDOM()", 
+            countQuery = "SELECT count(*) FROM posts p WHERE p.id NOT IN :excludedPostIds", 
+            nativeQuery = true)
+    Page<Post> findAllRandomly(@Param("excludedPostIds") List<Long> excludedPostIds, Pageable pageable);
 
     // 2. Bir Başkasının Profili (O kişinin postları - Sayfalı)
     Page<Post> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
-    // 3. Yakındaki Postlar (Sayfalı Native Query)
-    // Native Query'de pagination için 'countQuery' yazmak ZORUNLUDUR.
-    // Yoksa Spring "Toplam kaç sayfa var?" sorusunun cevabını hesaplayamaz ve hata verir.
+    // 3. Yakındaki Postlar (Konum) - Uygulamanın Başlamasını Sağlayan Orijinal Sorgu
     @Query(value = "SELECT * FROM posts p WHERE " +
             "(6371 * acos(cos(radians(:lat)) * cos(radians(p.latitude)) * " +
             "cos(radians(p.longitude) - radians(:lon)) + " +
