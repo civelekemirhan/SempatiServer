@@ -2,17 +2,17 @@ package com.wexec.SempatiServer.controller;
 
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.CommentRequest;
-import com.wexec.SempatiServer.dto.PagedResponse; // <-- Yeni DTO
+import com.wexec.SempatiServer.dto.PagedResponse;
+import com.wexec.SempatiServer.dto.PostDto; // <-- BU İMPORT KRİTİK (DTO KULLANACAĞIZ)
 import com.wexec.SempatiServer.dto.PostRequest;
 import com.wexec.SempatiServer.entity.Comment;
 import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.service.PostService;
 import lombok.RequiredArgsConstructor;
-
-import java.util.List;
-
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -21,37 +21,45 @@ public class PostController {
 
     private final PostService postService;
 
+    // 1. Post Oluşturma (Service createPost metodu Post döndüğü için burası Post kalabilir)
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public GenericResponse<Post> createPost(@ModelAttribute PostRequest request) {
         return postService.createPost(request);
     }
 
+    // 2. Tüm Postlar (Feed Akışı) -> DÖNÜŞ TİPİ DTO OLDU
     @GetMapping
-    public GenericResponse<PagedResponse<Post>> getAllPosts(
+    public GenericResponse<PagedResponse<PostDto>> getAllPosts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) List<Long> excludedPostIds) {
+            @RequestParam(required = false) List<Long> excludedPostIds) { // Filtreleme parametresi
+
         return postService.getAllPosts(page, size, excludedPostIds);
     }
 
+    // 3. Yakınlardaki Postlar -> DÖNÜŞ TİPİ DTO OLDU
     @GetMapping("/nearby")
-    public GenericResponse<PagedResponse<Post>> getNearbyPosts(
+    public GenericResponse<PagedResponse<PostDto>> getNearbyPosts(
             @RequestParam double lat,
             @RequestParam double lon,
             @RequestParam(defaultValue = "10") double dist,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+
         return postService.getNearbyPosts(lat, lon, dist, page, size);
     }
 
+    // 4. Profil Postları -> DÖNÜŞ TİPİ DTO OLDU
     @GetMapping("/user/{userId}")
-    public GenericResponse<PagedResponse<Post>> getUserPosts(
+    public GenericResponse<PagedResponse<PostDto>> getUserPosts(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+
         return postService.getUserPosts(userId, page, size);
     }
 
+    // 5. Yorum Ekleme
     @PostMapping("/{postId}/comments")
     public GenericResponse<Comment> addComment(
             @PathVariable Long postId,
@@ -59,6 +67,7 @@ public class PostController {
         return postService.addComment(postId, request);
     }
 
+    // 6. Beğeni İşlemi
     @PostMapping("/{postId}/like")
     public GenericResponse<String> toggleLike(@PathVariable Long postId) {
         return postService.toggleLike(postId);
