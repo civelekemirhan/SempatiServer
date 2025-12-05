@@ -48,15 +48,8 @@ public class PostService {
             for (MultipartFile file : request.getImages()) {
                 if (file != null && !file.isEmpty()) {
 
-                    // --- 1. DÜZELTME: VİDEO KORUMASI ---
+                    imageAnalysisService.validateImageContent(file);
                     String contentType = file.getContentType();
-
-                    // Sadece dosya bir RESİM ise yapay zekaya sor.
-                    // Video ise (veya tipi belirsizse) AI kontrolünü atla.
-                    if (contentType != null && contentType.startsWith("image")) {
-                        imageAnalysisService.validateImageContent(file);
-                    }
-                    // -----------------------------------
 
                     // S3 YÜKLEME (Video da olsa resim de olsa yüklenir)
                     String url = s3Service.uploadFile(file);
