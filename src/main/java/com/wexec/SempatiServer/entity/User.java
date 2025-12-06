@@ -17,7 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 @Entity
 @Table(name = "users")
-@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class User implements UserDetails {
 
     @Id
@@ -30,54 +30,43 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Gender gender;
+
     private String nickname;
+
+    @Column(length = 500)
+    private String bio; // YENİ: Biyografi
+
+    @Enumerated(EnumType.STRING)
+    private ProfileIcon profileIcon; // YENİ: URL yerine Enum
+
     @JsonIgnore
     private String password;
 
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    private boolean enabled; // Sadece bu kalıyor (True/False)
+    private boolean enabled;
 
-    // Token ilişkileri (Opsiyonel, veritabanı seviyesinde cascade silme için iyi
-    // olur)
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Pet> pets; // Kullanıcının petleri
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonIgnore
     private List<RefreshToken> refreshTokens;
 
-    // UserDetails methodları...
+    @Builder.Default
+    @Column(nullable = false)
+    private Long tokenVersion = 0L;
+
     @Override
     @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
-    @Override
-    public String getUsername() {
-        return email;
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    @Builder.Default // Eğer builder kullanıyorsan varsayılan değer ataması için
-    @Column(nullable = false)
-    private Long tokenVersion = 0L; // Varsayılan 0
+    @Override public String getUsername() { return email; }
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return enabled; }
 }

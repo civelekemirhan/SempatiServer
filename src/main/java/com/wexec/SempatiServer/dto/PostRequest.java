@@ -9,11 +9,10 @@ import java.util.List;
 public class PostRequest {
     private String description;
     private PostType type;
-
-    // Konum (Kayıp ilanları için zorunlu olabilir frontend'de)
     private Double latitude;
     private Double longitude;
     private String address;
+    private List<MultipartFile> images;
 
-    private List<MultipartFile> images; // Çoklu resim yükleme
+    private List<Long> taggedPetIds; // YENİ: Etiketlenen Petlerin ID'leri (örn: [1, 5])
 }

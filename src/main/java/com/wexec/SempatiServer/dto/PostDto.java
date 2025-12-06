@@ -22,4 +22,5 @@ public class PostDto {
     private List<CommentDto> comments;    // Yorumlar (Özet)
     private List<LikeDto> likes;          // Beğeniler (Özet)
     private int likeCount;
+    private List<PetDto> taggedPets;
 }

@@ -1,8 +1,9 @@
 package com.wexec.SempatiServer.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,14 +18,21 @@ public class Pet {
     private Long id;
 
     private String name;
-    private String genus;   // Kedi, Köpek vb.
+    private String genus;   // Kedi, Köpek
     private String breed;   // Cins (Tekir, Golden)
-    private String gender;  // Dişi, Erkek
-    private LocalDate birthDate;
+
+    private Integer age;        // YENİ: Doğum tarihi yerine yaş
+    private boolean isNeutered; // YENİ: Kısırlaştırılmış mı?
 
     private String profilePictureUrl; // S3 Linki
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
-    private User owner; // Sahibi
+    @JsonIgnore // Sonsuz döngü olmasın diye
+    private User owner;
+
+    // Bir pet birçok postta etiketlenebilir
+    @ManyToMany(mappedBy = "taggedPets")
+    @JsonIgnore
+    private List<Post> taggedInPosts;
 }

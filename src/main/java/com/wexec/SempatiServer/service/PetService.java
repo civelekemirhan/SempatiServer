@@ -1,24 +1,22 @@
 package com.wexec.SempatiServer.service;
 
-import com.wexec.SempatiServer.common.GenericResponse;
-import com.wexec.SempatiServer.dto.PetRequest;
-import com.wexec.SempatiServer.entity.Pet;
-import com.wexec.SempatiServer.entity.User;
-import com.wexec.SempatiServer.repository.PetRepository;
+import com.wexec.SempatiServer.common.*;
+import com.wexec.SempatiServer.dto.*;
+import com.wexec.SempatiServer.entity.*;
+import com.wexec.SempatiServer.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-@SuppressWarnings("null")
 public class PetService {
 
     private final PetRepository petRepository;
     private final S3Service s3Service;
 
-    public GenericResponse<Pet> addPet(PetRequest request) {
-        // Giriş yapmış kullanıcıyı al (JWT Filter sayesinde buraya User objesi gelir)
+    // Pet Ekleme
+    public GenericResponse<PetDto> addPet(PetRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         String photoUrl = null;
@@ -30,13 +28,20 @@ public class PetService {
                 .name(request.getName())
                 .genus(request.getGenus())
                 .breed(request.getBreed())
-                .gender(request.getGender())
-                .birthDate(request.getBirthDate())
+                .age(request.getAge())
+                .isNeutered(request.isNeutered())
                 .profilePictureUrl(photoUrl)
                 .owner(user)
                 .build();
 
         petRepository.save(pet);
-        return GenericResponse.success(pet);
+        return GenericResponse.success(PetDto.fromEntity(pet));
+    }
+
+    // ID ile Pet Getir (Detay Sayfası İçin)
+    public GenericResponse<PetDto> getPetById(Long petId) {
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST, "Pet bulunamadı."));
+        return GenericResponse.success(PetDto.fromEntity(pet));
     }
 }

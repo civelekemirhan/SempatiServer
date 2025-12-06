@@ -53,4 +53,12 @@ public class Post {
     public int getLikeCount() {
         return likes != null ? likes.size() : 0;
     }
+
+    @ManyToMany
+    @JoinTable(
+            name = "post_pet_tags",
+            joinColumns = @JoinColumn(name = "post_id"),
+            inverseJoinColumns = @JoinColumn(name = "pet_id")
+    )
+    private List<Pet> taggedPets;
 }

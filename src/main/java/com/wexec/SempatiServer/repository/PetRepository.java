@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface PetRepository extends JpaRepository<Pet, Long> {
-    // Belirli bir kullanıcının hayvanlarını getir
+    // Bir kullanıcının petlerini bulmak için
     List<Pet> findByOwnerId(Long ownerId);
 }

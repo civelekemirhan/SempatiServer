@@ -74,16 +74,19 @@ public class AuthService {
             return GenericResponse.success("Önceki kayıt doğrulanmamıştı. Yeni doğrulama kodu gönderildi.");
         }
 
-        // Yeni Kullanıcı (PhoneNumber YOK)
+        ProfileIcon icon = ProfileIcon.ANONYMOUS;
+        if (request.getGender() == Gender.MALE) icon = ProfileIcon.ICON1;
+        else if (request.getGender() == Gender.FEMALE) icon = ProfileIcon.ICON5;
+
         User user = User.builder()
                 .email(request.getEmail())
                 .gender(request.getGender())
                 .nickname(request.getNickname())
+                .profileIcon(icon) // <-- ATAMA BURADA
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.USER)
                 .enabled(false)
                 .build();
-
         User savedUser = userRepository.save(user);
 
         String code = String.valueOf(new Random().nextInt(900000) + 100000);
