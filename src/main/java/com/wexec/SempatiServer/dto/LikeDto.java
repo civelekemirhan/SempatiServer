@@ -7,5 +7,5 @@ import lombok.Data;
 @Builder
 public class LikeDto {
     private Long id;
-    private UserProfileResponse user; // Beğenenin özeti
+    private UserSummaryDto user; // Beğenenin özeti
 }

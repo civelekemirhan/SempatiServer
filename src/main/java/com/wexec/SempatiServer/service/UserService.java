@@ -3,14 +3,20 @@ package com.wexec.SempatiServer.service;
 import com.wexec.SempatiServer.common.BusinessException;
 import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
+import com.wexec.SempatiServer.dto.PostDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
+import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.entity.User;
+import com.wexec.SempatiServer.repository.PostRepository;
 import com.wexec.SempatiServer.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,15 +24,36 @@ public class UserService {
 
     private final UserRepository userRepository;
 
+    // --- YENİ EKLENENLER ---
+    private final PostRepository postRepository; // Veriyi çekmek için
+    private final PostService postService;       // Post -> PostDto çevirisi için
+    // -----------------------
+
     // 1. Kendi Profilimi Getir
+    @Transactional(readOnly = true) // Lazy loading hatası almamak için Transactional ekledik
     public GenericResponse<UserProfileResponse> getMyProfile() {
         User currentUser = getCurrentAuthenticatedUser();
 
-        // DTO'daki fromEntity metodunu kullanıyoruz (Petler, Bio, Icon otomatik gelir)
-        return GenericResponse.success(UserProfileResponse.fromEntity(currentUser));
+        // 1. Kullanıcı bilgilerini DTO'ya çevir
+        UserProfileResponse response = UserProfileResponse.fromEntity(currentUser);
+
+        // 2. Kullanıcının postlarını Entity (Post) olarak çek (En yeni en üstte)
+        List<Post> userPosts = postRepository.findAllByUserIdOrderByCreatedAtDesc(currentUser.getId());
+
+        // 3. Entity Listesini -> DTO Listesine çevir
+        // PostService içindeki convertToPostDto metodunu kullanıyoruz
+        List<PostDto> postDtos = userPosts.stream()
+                .map(postService::convertToPostDto) // Method reference kullanımı
+                .collect(Collectors.toList());
+
+        // 4. DTO listesini cevaba ekle
+        response.setPosts(postDtos);
+
+        return GenericResponse.success(response);
     }
 
     // 2. Başkasının Profilini Getir (ID ile)
+    @Transactional(readOnly = true)
     public GenericResponse<UserProfileResponse> getUserProfileById(Long userId) {
         if (userId == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "User ID boş olamaz.");
@@ -35,7 +62,21 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        return GenericResponse.success(UserProfileResponse.fromEntity(user));
+        // 1. Kullanıcı bilgilerini DTO'ya çevir
+        UserProfileResponse response = UserProfileResponse.fromEntity(user);
+
+        // 2. Kullanıcının postlarını Entity olarak çek
+        List<Post> userPosts = postRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+
+        // 3. Entity -> DTO Çevrimi
+        List<PostDto> postDtos = userPosts.stream()
+                .map(postService::convertToPostDto)
+                .collect(Collectors.toList());
+
+        // 4. Listeyi ekle
+        response.setPosts(postDtos);
+
+        return GenericResponse.success(response);
     }
 
     // 3. Profil İkonu Güncelleme
@@ -50,6 +91,7 @@ public class UserService {
         currentUser.setProfileIcon(newIcon);
         userRepository.save(currentUser);
 
+        // İkon güncelleyince postları çekmeye gerek yok, sadece kullanıcı bilgisini dönüyoruz
         return GenericResponse.success(UserProfileResponse.fromEntity(currentUser));
     }
 

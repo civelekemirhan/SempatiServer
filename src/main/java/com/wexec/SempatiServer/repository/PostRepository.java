@@ -1,7 +1,7 @@
 package com.wexec.SempatiServer.repository;
 
+import com.wexec.SempatiServer.dto.PostDto;
 import com.wexec.SempatiServer.entity.Post;
-import com.wexec.SempatiServer.entity.PostType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,33 +12,40 @@ import java.util.List;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-    // 1. Anasayfa Akışı (Rastgele + Filtreli)
-    // JPQL'e geçtik: Dinamik filtreleme (:type IS NULL) için en temiz yöntem budur.
-    @Query("SELECT p FROM Post p " +
-            "WHERE p.id NOT IN :excludedPostIds " +
-            "AND (:type IS NULL OR p.type = :type) " +
-            "ORDER BY FUNCTION('RANDOM')")
-    Page<Post> findAllRandomly(@Param("excludedPostIds") List<Long> excludedPostIds,
-                               @Param("type") PostType type,
-                               Pageable pageable);
+    // 1. Anasayfa Akışı (SEED ile)
+    // DEĞİŞİKLİK: Parametre artık 'String type'.
+    // Logic: CAST(:type AS text) diyerek PostgreSQL'e "Gelen null bile olsa, bu bir string null'ıdır" diyoruz.
+    @Query(value = "SELECT * FROM posts p " +
+            "WHERE (CAST(:type AS text) IS NULL OR p.type = CAST(:type AS text)) " +
+            "ORDER BY md5(CAST(p.id AS text) || :seed)",
+            countQuery = "SELECT count(*) FROM posts p WHERE (CAST(:type AS text) IS NULL OR p.type = CAST(:type AS text))",
+            nativeQuery = true)
+    Page<Post> findAllRandomlyWithSeed(@Param("seed") String seed,
+                                       @Param("type") String type, // <-- PostType değil String
+                                       Pageable pageable);
 
-    // 2. Bir Başkasının Profili (Değişiklik yok)
+    // 2. Profil
     Page<Post> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
-    // 3. Yakındaki Postlar (Konum + Filtreli)
-    // Matematik formülünü JPQL formatına uyarladık ve Type filtresini ekledik.
-    @Query("SELECT p FROM Post p WHERE " +
+    // 3. Yakındakiler
+    // DEĞİŞİKLİK: Burada da 'String type' kullanıyoruz.
+    @Query(value = "SELECT * FROM posts p WHERE " +
             "(6371 * acos(cos(radians(:lat)) * cos(radians(p.latitude)) * " +
             "cos(radians(p.longitude) - radians(:lon)) + " +
             "sin(radians(:lat)) * sin(radians(p.latitude)))) < :distance " +
-            "AND (:type IS NULL OR p.type = :type) " +
-            "ORDER BY p.createdAt DESC")
+            "AND (CAST(:type AS text) IS NULL OR p.type = CAST(:type AS text)) " +
+            "ORDER BY p.created_at DESC",
+            countQuery = "SELECT count(*) FROM posts p WHERE " +
+                    "(6371 * acos(cos(radians(:lat)) * cos(radians(p.latitude)) * " +
+                    "cos(radians(p.longitude) - radians(:lon)) + " +
+                    "sin(radians(:lat)) * sin(radians(p.latitude)))) < :distance " +
+                    "AND (CAST(:type AS text) IS NULL OR p.type = CAST(:type AS text))",
+            nativeQuery = true)
     Page<Post> findNearbyPosts(@Param("lat") double lat,
                                @Param("lon") double lon,
                                @Param("distance") double distance,
-                               @Param("type") PostType type,
+                               @Param("type") String type, // <-- PostType değil String
                                Pageable pageable);
 
-    // (Eski metod, artık kullanılmayabilir ama durmasında sakınca yok)
-    List<Post> findByTypeOrderByCreatedAtDesc(PostType type);
+    List<Post> findAllByUserIdOrderByCreatedAtDesc(Long userId); // <--- BU METOD DOĞRU
 }

@@ -18,9 +18,11 @@ public class PostDto {
     private String address;
     private List<String> mediaUrls;
 
-    private UserProfileResponse user;     // Post sahibi (Özet)
-    private List<CommentDto> comments;    // Yorumlar (Özet)
-    private List<LikeDto> likes;          // Beğeniler (Özet)
+    private UserSummaryDto user;
+
+    private List<CommentDto> comments;
+    private List<LikeDto> likes;
+
     private int likeCount;
-    private List<PetDto> taggedPets;
+    private List<Long> taggedPetIds; // Sadece ID'ler
 }

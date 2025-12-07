@@ -1,6 +1,7 @@
 package com.wexec.SempatiServer.dto;
 
 import com.wexec.SempatiServer.entity.Gender;
+import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.entity.User;
 import lombok.Builder;
@@ -17,8 +18,9 @@ public class UserProfileResponse {
     private String nickname;
     private String bio;
     private Gender gender;
-    private ProfileIcon profileIcon; // YENİ
-    private List<PetDto> pets;
+    private ProfileIcon profileIcon;
+    private List<PetDto> pets; // Profilde tam liste istiyoruz
+    private List<PostDto> posts;
 
     public static UserProfileResponse fromEntity(User user) {
         return UserProfileResponse.builder()
@@ -27,7 +29,8 @@ public class UserProfileResponse {
                 .nickname(user.getNickname())
                 .bio(user.getBio())
                 .gender(user.getGender())
-                .profileIcon(user.getProfileIcon()) // Enum dönüyoruz
+                .profileIcon(user.getProfileIcon())
+                // Burada pets listesini dolduruyoruz, UserService transaction içinde olduğu için çalışır.
                 .pets(user.getPets() != null ?
                         user.getPets().stream().map(PetDto::fromEntity).collect(Collectors.toList())
                         : new ArrayList<>())

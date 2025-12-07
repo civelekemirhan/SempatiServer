@@ -10,5 +10,5 @@ public class CommentDto {
     private Long id;
     private String text;
     private LocalDateTime createdAt;
-    private UserProfileResponse user; // Yorumu yapanın özeti
+    private UserSummaryDto user; // Yorumu yapanın özeti
 }
