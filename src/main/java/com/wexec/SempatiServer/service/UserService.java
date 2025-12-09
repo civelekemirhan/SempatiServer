@@ -3,6 +3,7 @@ package com.wexec.SempatiServer.service;
 import com.wexec.SempatiServer.common.BusinessException;
 import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
+import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.PostDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
 import com.wexec.SempatiServer.entity.Post;
@@ -15,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -109,4 +111,20 @@ public class UserService {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
+
+    // 4. Benim Petlerimi Getir 
+    @Transactional(readOnly = true)
+    public GenericResponse<List<PetDto>> getMyPets() {
+    // O anki kimliği doğrulanmış kullanıcıyı bul.
+    User currentUser = getCurrentAuthenticatedUser(); 
+
+    // 2. Kullanıcının pet listesini çek ve PetDto'ya dönüştür.
+    List<PetDto> petDtos = currentUser.getPets() != null ?
+            currentUser.getPets().stream()
+                    .map(PetDto::fromEntity)
+                    .collect(Collectors.toList())
+            : new ArrayList<>(); // Kullanıcının petleri yoksa boş liste döner.
+
+    return GenericResponse.success(petDtos);
+}
 }
