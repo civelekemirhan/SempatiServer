@@ -22,7 +22,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,32 +33,54 @@ public class PostService {
     private final CommentRepository commentRepository;
     private final PostLikeRepository postLikeRepository;
     private final S3Service s3Service;
-    private final ImageAnalysisService imageAnalysisService;
+    private final IImageAnalysisService imageAnalysisService;
     private final PetRepository petRepository;
 
-
-    // --- Post Oluşturma ---
     @Transactional
     public GenericResponse<PostDto> createPost(PostRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         List<String> mediaUrls = new ArrayList<>();
 
-        if (request.getImages() != null) {
+        boolean userSentFiles = request.getImages() != null && !request.getImages().isEmpty();
+
+        if (userSentFiles) {
             for (MultipartFile file : request.getImages()) {
-                if (file != null && !file.isEmpty()) {
-                    String contentType = file.getContentType();
-                    if (contentType != null && contentType.startsWith("image")) {
-                        try {
-                            imageAnalysisService.validateImageContent(file);
-                        } catch (BusinessException e) {
+                if (file == null || file.isEmpty()) {
+                    continue;
+                }
+
+                String contentType = file.getContentType();
+
+                if (contentType != null && (contentType.startsWith("image") || contentType.startsWith("video"))) {
+                    try {
+                        imageAnalysisService.validateImageContent(file);
+                        String url = s3Service.uploadFile(file);
+                        mediaUrls.add(url);
+
+                    } catch (BusinessException e) {
+                        if (e.getErrorCode() == ErrorCode.IMAGE_INVALID_CONTENT) {
+                            continue;
+                        } else {
                             throw e;
                         }
                     }
+                } else {
+                    // Resim/Video dışındaki dosyalar direkt yüklensin
                     String url = s3Service.uploadFile(file);
                     mediaUrls.add(url);
                 }
             }
+        }
+        if (userSentFiles && mediaUrls.isEmpty()) {
+            throw new BusinessException(ErrorCode.IMAGE_INVALID_CONTENT,
+                    "Yüklediğiniz dosyaların hiçbirinde kedi/köpek tespit edilemedi.");
+        }
+
+        // Eğer kullanıcı hiç dosya göndermediyse ve açıklama da yoksa hata ver
+        if (mediaUrls.isEmpty() && (request.getDescription() == null || request.getDescription().trim().isEmpty())) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Geçerli bir fotoğraf/video veya açıklama girmelisiniz.");
         }
 
         List<Pet> taggedPets = new ArrayList<>();
@@ -146,7 +167,6 @@ public class PostService {
     // =================================================================
 
     // 1. Tüm Postlar (Feed Akışı)
-    // List<Long> excludedPostIds YERİNE String seed kullanıyoruz.
     @Transactional(readOnly = true)
     public GenericResponse<PagedResponse<PostDto>> getAllPosts(int page, int size, String seed, PostType type) {
 
@@ -154,13 +174,9 @@ public class PostService {
             seed = "default-seed";
         }
 
-        // DÜZELTME BURASI:
-        // Enum'ı String'e çeviriyoruz. Eğer null ise null string gider.
         String typeStr = (type != null) ? type.name() : null;
-
         Pageable pageable = PageRequest.of(page, size);
 
-        // Repository'e String halini gönderiyoruz
         Page<Post> postsPage = postRepository.findAllRandomlyWithSeed(seed, typeStr, pageable);
 
         Page<PostDto> dtoPage = postsPage.map(this::convertToPostDto);
@@ -180,14 +196,12 @@ public class PostService {
     }
 
     // 3. Yakındaki Postlar (Konum)
-    public GenericResponse<PagedResponse<PostDto>> getNearbyPosts(double lat, double lon, double distanceKm, PostType type, int page, int size) {
+    public GenericResponse<PagedResponse<PostDto>> getNearbyPosts(double lat, double lon, double distanceKm,
+            PostType type, int page, int size) {
 
-        // DÜZELTME BURASI:
         String typeStr = (type != null) ? type.name() : null;
-
         Pageable pageable = PageRequest.of(page, size);
 
-        // Repository'e String halini gönderiyoruz
         Page<Post> postsPage = postRepository.findNearbyPosts(lat, lon, distanceKm, typeStr, pageable);
 
         Page<PostDto> dtoPage = postsPage.map(this::convertToPostDto);
@@ -225,10 +239,9 @@ public class PostService {
                                 .build())
                         .collect(Collectors.toList()) : new ArrayList<>())
 
-                .taggedPetIds(post.getTaggedPets() != null ?
-                        post.getTaggedPets().stream()
-                                .map(Pet::getId)
-                                .collect(Collectors.toList())
+                .taggedPetIds(post.getTaggedPets() != null ? post.getTaggedPets().stream()
+                        .map(Pet::getId)
+                        .collect(Collectors.toList())
                         : new ArrayList<>())
                 .build();
     }
