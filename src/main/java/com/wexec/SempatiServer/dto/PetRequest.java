@@ -9,6 +9,6 @@ public class PetRequest {
     private String genus;
     private String breed;
     private Integer age;
-    private boolean isNeutered;
+    private Boolean isNeutered;
     private MultipartFile image; // Profil fotosu (Zorunlu değilse null gelebilir)
 }

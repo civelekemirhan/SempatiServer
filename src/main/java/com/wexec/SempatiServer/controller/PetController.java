@@ -20,6 +20,12 @@ public class PetController {
         return petService.addPet(request);
     }
 
+    @PatchMapping(value = "/{petId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public GenericResponse<PetDto> updatePet(@PathVariable Long petId,
+                                            @ModelAttribute PetRequest request) {
+        return petService.updatePet(petId, request);
+   }
+
     @GetMapping("/{petId}")
     public GenericResponse<PetDto> getPetById(@PathVariable Long petId) {
         return petService.getPetById(petId);
