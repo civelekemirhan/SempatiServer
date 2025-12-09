@@ -1,11 +1,14 @@
 package com.wexec.SempatiServer.controller;
 
 import com.wexec.SempatiServer.common.GenericResponse;
+import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -18,6 +21,12 @@ public class UserController {
     @GetMapping("/me")
     public GenericResponse<UserProfileResponse> getMyProfile() {
         return userService.getMyProfile();
+    }
+
+    // Benim Petlerim 
+    @GetMapping("/myPets")
+    public GenericResponse<List<PetDto>> getMyPets() {
+        return userService.getMyPets();
     }
 
     // Başkasının profili (ID ile)
