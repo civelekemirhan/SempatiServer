@@ -6,6 +6,7 @@ import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.PostDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
+import com.wexec.SempatiServer.dto.UserUpdateRequest;
 import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.entity.User;
@@ -28,7 +29,7 @@ public class UserService {
 
     // --- YENİ EKLENENLER ---
     private final PostRepository postRepository; // Veriyi çekmek için
-    private final PostService postService;       // Post -> PostDto çevirisi için
+    private final PostService postService; // Post -> PostDto çevirisi için
     // -----------------------
 
     // 1. Kendi Profilimi Getir
@@ -93,7 +94,8 @@ public class UserService {
         currentUser.setProfileIcon(newIcon);
         userRepository.save(currentUser);
 
-        // İkon güncelleyince postları çekmeye gerek yok, sadece kullanıcı bilgisini dönüyoruz
+        // İkon güncelleyince postları çekmeye gerek yok, sadece kullanıcı bilgisini
+        // dönüyoruz
         return GenericResponse.success(UserProfileResponse.fromEntity(currentUser));
     }
 
@@ -112,19 +114,53 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
-    // 4. Benim Petlerimi Getir 
+    // 4. Benim Petlerimi Getir
     @Transactional(readOnly = true)
     public GenericResponse<List<PetDto>> getMyPets() {
-    // O anki kimliği doğrulanmış kullanıcıyı bul.
-    User currentUser = getCurrentAuthenticatedUser(); 
+        // O anki kimliği doğrulanmış kullanıcıyı bul.
+        User currentUser = getCurrentAuthenticatedUser();
 
-    // 2. Kullanıcının pet listesini çek ve PetDto'ya dönüştür.
-    List<PetDto> petDtos = currentUser.getPets() != null ?
-            currentUser.getPets().stream()
-                    .map(PetDto::fromEntity)
-                    .collect(Collectors.toList())
-            : new ArrayList<>(); // Kullanıcının petleri yoksa boş liste döner.
+        // 2. Kullanıcının pet listesini çek ve PetDto'ya dönüştür.
+        List<PetDto> petDtos = currentUser.getPets() != null ? currentUser.getPets().stream()
+                .map(PetDto::fromEntity)
+                .collect(Collectors.toList())
+                : new ArrayList<>(); // Kullanıcının petleri yoksa boş liste döner.
 
-    return GenericResponse.success(petDtos);
-}
+        return GenericResponse.success(petDtos);
+    }
+
+    // Profil Düzenleme (PATCH)
+    @Transactional
+    public GenericResponse<UserProfileResponse> updateUserProfile(UserUpdateRequest request) {
+        // 1. O anki giriş yapmış kullanıcıyı bul
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        // 2. Veritabanından güncel halini çek (Garanti olsun)
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 3. Sadece dolu gelen alanları güncelle (PATCH Mantığı)
+
+        if (request.getNickname() != null && !request.getNickname().trim().isEmpty()) {
+            user.setNickname(request.getNickname());
+        }
+
+        if (request.getBio() != null) {
+            user.setBio(request.getBio());
+        }
+
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+
+        if (request.getProfileIcon() != null) {
+            user.setProfileIcon(request.getProfileIcon());
+        }
+
+        // 4. Kaydet
+        User savedUser = userRepository.save(user);
+
+        // 5. Güncel profili dön
+        return GenericResponse.success(UserProfileResponse.fromEntity(savedUser));
+    }
 }
