@@ -3,7 +3,8 @@ package com.wexec.SempatiServer.controller;
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
-import com.wexec.SempatiServer.dto.UserUpdateRequest; // YENİ DTO İMPORTU
+import com.wexec.SempatiServer.dto.UserUpdateRequest;
+import com.wexec.SempatiServer.dto.ChangePasswordRequest;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -41,5 +42,10 @@ public class UserController {
     @PatchMapping("/icon")
     public GenericResponse<UserProfileResponse> updateProfileIcon(@RequestParam ProfileIcon icon) {
         return userService.updateProfileIcon(icon);
+    }
+
+    @PatchMapping("/change-password")
+    public GenericResponse<String> changePassword(@RequestBody ChangePasswordRequest request) {
+        return userService.changePassword(request);
     }
 }

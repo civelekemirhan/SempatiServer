@@ -3,6 +3,7 @@ package com.wexec.SempatiServer.service;
 import com.wexec.SempatiServer.common.BusinessException;
 import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
+import com.wexec.SempatiServer.dto.ChangePasswordRequest;
 import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.PostDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
@@ -10,6 +11,7 @@ import com.wexec.SempatiServer.dto.UserUpdateRequest;
 import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.entity.User;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.wexec.SempatiServer.repository.PostRepository;
 import com.wexec.SempatiServer.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // --- YENİ EKLENENLER ---
     private final PostRepository postRepository; // Veriyi çekmek için
@@ -163,4 +166,26 @@ public class UserService {
         // 5. Güncel profili dön
         return GenericResponse.success(UserProfileResponse.fromEntity(savedUser));
     }
+
+    // Şifre Değiştirme Metodu
+    @Transactional
+    public GenericResponse<String> changePassword(ChangePasswordRequest request) {
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        User dbUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), dbUser.getPassword())) {
+            throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS, "Mevcut şifreniz hatalı.");
+        }
+
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Yeni şifre en az 6 karakter olmalıdır.");
+        }
+        dbUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(dbUser);
+
+        return GenericResponse.success("Şifreniz başarıyla güncellendi.");
+    }
+
 }
