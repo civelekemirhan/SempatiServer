@@ -3,6 +3,7 @@ package com.wexec.SempatiServer.controller;
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
+import com.wexec.SempatiServer.dto.UserUpdateRequest; // YENİ DTO İMPORTU
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -17,26 +18,26 @@ public class UserController {
 
     private final UserService userService;
 
-    // Kendi profilim
     @GetMapping("/me")
     public GenericResponse<UserProfileResponse> getMyProfile() {
         return userService.getMyProfile();
     }
 
-    // Benim Petlerim 
     @GetMapping("/myPets")
     public GenericResponse<List<PetDto>> getMyPets() {
         return userService.getMyPets();
     }
 
-    // Başkasının profili (ID ile)
     @GetMapping("/{userId}")
     public GenericResponse<UserProfileResponse> getUserProfileById(@PathVariable Long userId) {
         return userService.getUserProfileById(userId);
     }
 
-    // İkon Güncelleme
-    // Kullanımı: POST /api/v1/users/icon?icon=ICON1
+    @PatchMapping("/me")
+    public GenericResponse<UserProfileResponse> updateMyProfile(@RequestBody UserUpdateRequest request) {
+        return userService.updateUserProfile(request);
+    }
+
     @PatchMapping("/icon")
     public GenericResponse<UserProfileResponse> updateProfileIcon(@RequestParam ProfileIcon icon) {
         return userService.updateProfileIcon(icon);
