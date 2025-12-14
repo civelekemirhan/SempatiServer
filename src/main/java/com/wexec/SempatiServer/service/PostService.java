@@ -208,6 +208,23 @@ public class PostService {
         return GenericResponse.success(mapToPagedResponse(dtoPage));
     }
 
+    // 4. Pet Profilindeki Postlar (Bir hayvanın etiketlendiği postlar)
+    public GenericResponse<PagedResponse<PostDto>> getPostsByPetId(Long petId, int page, int size) {
+        if (petId == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Pet ID gereklidir.");
+        }
+        if (!petRepository.existsById(petId)) {
+            throw new BusinessException(ErrorCode.PET_NOT_FOUND);
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<Post> postsPage = postRepository.findByTaggedPetsIdOrderByCreatedAtDesc(petId, pageable);
+
+        Page<PostDto> dtoPage = postsPage.map(this::convertToPostDto);
+        return GenericResponse.success(mapToPagedResponse(dtoPage));
+    }
+
     // --- DTO Dönüştürücü ---
     PostDto convertToPostDto(Post post) {
         return PostDto.builder()

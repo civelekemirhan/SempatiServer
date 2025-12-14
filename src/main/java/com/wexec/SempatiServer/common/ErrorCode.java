@@ -27,6 +27,7 @@ public enum ErrorCode {
     REFRESH_EXPIRED("AUTH_008", "Oturum süresi dolmuş, lütfen tekrar giriş yapın.", HttpStatus.UNAUTHORIZED),
 
     USER_NOT_FOUND("USER_001", "Kullanıcı bulunamadı.", HttpStatus.NOT_FOUND),
+    PET_NOT_FOUND("PET_001", "İEvcil hayvan bulunamadı.", HttpStatus.NOT_FOUND),
 
     IMAGE_INVALID_CONTENT("IMG_001", "Yüklenen fotoğrafta kedi veya köpek tespit edilemedi.", HttpStatus.BAD_REQUEST),
     AI_SERVICE_ERROR("IMG_002", "Yapay zeka servisine erişilemedi.", HttpStatus.INTERNAL_SERVER_ERROR),
