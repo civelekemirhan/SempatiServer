@@ -188,4 +188,15 @@ public class UserService {
         return GenericResponse.success("Şifreniz başarıyla güncellendi.");
     }
 
+    // Hesap Silme Metodu
+    @Transactional
+    public GenericResponse<String> deleteCurrentUserAccount() {
+    
+    User currentUser = getCurrentAuthenticatedUser(); 
+
+    userRepository.delete(currentUser);
+
+    return GenericResponse.success("Hesabınız ve tüm verileriniz başarıyla silinmiştir.");
+    }
+
 }

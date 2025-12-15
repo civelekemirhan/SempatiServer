@@ -66,9 +66,22 @@ public class PostController {
         return postService.addComment(postId, request);
     }
 
-    // 6. Beğeni İşlemi
+    // 6. Yorum Silme
+    @DeleteMapping("/comments/{commentId}")
+    public GenericResponse<String> deleteComment(@PathVariable Long commentId) {
+    return postService.deleteComment(commentId);
+    }
+
+    // 7. Beğeni İşlemi
     @PostMapping("/{postId}/like")
     public GenericResponse<String> toggleLike(@PathVariable Long postId) {
         return postService.toggleLike(postId);
     }
-}
+
+    // 8. Post Silme
+    @DeleteMapping("/{postId}")
+    public GenericResponse<String> deletePost(@PathVariable Long postId) {
+    return postService.deletePost(postId);
+    }
+    }
+

@@ -48,4 +48,9 @@ public class UserController {
     public GenericResponse<String> changePassword(@RequestBody ChangePasswordRequest request) {
         return userService.changePassword(request);
     }
+
+    @DeleteMapping("/me")
+    public GenericResponse<String> deleteMyAccount() {
+    return userService.deleteCurrentUserAccount();
+    }
 }
