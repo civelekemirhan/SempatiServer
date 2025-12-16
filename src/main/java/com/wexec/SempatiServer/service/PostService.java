@@ -40,8 +40,19 @@ public class PostService {
     public GenericResponse<PostDto> createPost(PostRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        List<String> mediaUrls = new ArrayList<>();
+        // Eğer post tipi LOST, CARETAKER veya ADOPTION ise konum ZORUNLU.
+        if (request.getType() == PostType.LOST ||
+                request.getType() == PostType.CARETAKER ||
+                request.getType() == PostType.ADOPTION) {
 
+            if (request.getLatitude() == null || request.getLongitude() == null ||
+                    request.getLatitude() == 0.0 || request.getLongitude() == 0.0) {
+                throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                        "Kayıp, Bakıcı ve Sahiplendirme ilanlarında konum bilgisi zorunludur.");
+            }
+        }
+
+        List<String> mediaUrls = new ArrayList<>();
         boolean userSentFiles = request.getImages() != null && !request.getImages().isEmpty();
 
         if (userSentFiles) {
@@ -72,6 +83,8 @@ public class PostService {
                 }
             }
         }
+
+        // Medya Validasyonu
         if (userSentFiles && mediaUrls.isEmpty()) {
             throw new BusinessException(ErrorCode.IMAGE_INVALID_CONTENT,
                     "Yüklediğiniz dosyaların hiçbirinde kedi/köpek tespit edilemedi.");
@@ -105,15 +118,6 @@ public class PostService {
     }
 
     // --- Yorum Ekleme ---
-    private CommentDto convertToCommentDto(Comment comment) {
-        return CommentDto.builder()
-                .id(comment.getId())
-                .text(comment.getText())
-                .createdAt(comment.getCreatedAt())
-                .user(UserSummaryDto.fromEntity(comment.getUser()))
-                .build();
-    }
-
     public GenericResponse<CommentDto> addComment(Long postId, CommentRequest request) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -135,8 +139,8 @@ public class PostService {
         return GenericResponse.success(convertToCommentDto(savedComment));
     }
 
-    // --- Beğeni (Like/Unlike) Mantığı ---
-    // toggle uygulamada işlevsellik sağladığından unlike için delete metodu eklenmedi.
+    // toggle uygulamada işlevsellik sağladığından unlike için delete metodu
+    // eklenmedi.
     @Transactional
     public GenericResponse<String> toggleLike(Long postId) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -200,9 +204,12 @@ public class PostService {
     public GenericResponse<PagedResponse<PostDto>> getNearbyPosts(double lat, double lon, double distanceKm,
             PostType type, int page, int size) {
 
+        // Enum'ı String'e çeviriyoruz (Native Query için), eğer null ise null gider.
         String typeStr = (type != null) ? type.name() : null;
+
         Pageable pageable = PageRequest.of(page, size);
 
+        // Repository sorgusunu çağır
         Page<Post> postsPage = postRepository.findNearbyPosts(lat, lon, distanceKm, typeStr, pageable);
 
         Page<PostDto> dtoPage = postsPage.map(this::convertToPostDto);
@@ -230,44 +237,44 @@ public class PostService {
     @Transactional
     public GenericResponse<String> deletePost(Long postId) {
 
-    User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-    if (postId == null) {
-        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Post ID boş olamaz.");
+        if (postId == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Post ID boş olamaz.");
+        }
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        if (!post.getUser().getId().equals(currentUser.getId())) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu postun sahibi siz değilsiniz.");
+        }
+
+        postRepository.delete(post);
+
+        return GenericResponse.success("Post başarıyla silindi.");
     }
 
-    Post post = postRepository.findById(postId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
-
-    if (!post.getUser().getId().equals(currentUser.getId())) {
-        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu postun sahibi siz değilsiniz.");
-    }
-    
-    postRepository.delete(post);
-
-    return GenericResponse.success("Post başarıyla silindi.");
-    }
-    
     // 6. Yorum Silme
     @Transactional
     public GenericResponse<String> deleteComment(Long commentId) {
 
-    User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-    if (commentId == null) {
-        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Yorum ID boş olamaz.");
-    }
+        if (commentId == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Yorum ID boş olamaz.");
+        }
 
-    Comment comment = commentRepository.findById(commentId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
 
-    if (!comment.getUser().getId().equals(currentUser.getId())) {
-        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu yoruma ait sahibi siz değilsiniz.");
-    }
+        if (!comment.getUser().getId().equals(currentUser.getId())) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu yoruma ait sahibi siz değilsiniz.");
+        }
 
-    commentRepository.delete(comment);
+        commentRepository.delete(comment);
 
-    return GenericResponse.success("Yorum başarıyla silindi.");
+        return GenericResponse.success("Yorum başarıyla silindi.");
     }
 
     // --- DTO Dönüştürücü ---
@@ -286,12 +293,7 @@ public class PostService {
                 .user(UserSummaryDto.fromEntity(post.getUser()))
 
                 .comments(post.getComments() != null ? post.getComments().stream()
-                        .map(c -> CommentDto.builder()
-                                .id(c.getId())
-                                .text(c.getText())
-                                .createdAt(c.getCreatedAt())
-                                .user(UserSummaryDto.fromEntity(c.getUser()))
-                                .build())
+                        .map(c -> convertToCommentDto(c))
                         .collect(Collectors.toList()) : new ArrayList<>())
 
                 .likes(post.getLikes() != null ? post.getLikes().stream()
@@ -305,6 +307,15 @@ public class PostService {
                         .map(Pet::getId)
                         .collect(Collectors.toList())
                         : new ArrayList<>())
+                .build();
+    }
+
+    private CommentDto convertToCommentDto(Comment comment) {
+        return CommentDto.builder()
+                .id(comment.getId())
+                .text(comment.getText())
+                .createdAt(comment.getCreatedAt())
+                .user(UserSummaryDto.fromEntity(comment.getUser()))
                 .build();
     }
 
