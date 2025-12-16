@@ -136,6 +136,7 @@ public class PostService {
     }
 
     // --- Beğeni (Like/Unlike) Mantığı ---
+    // toggle uygulamada işlevsellik sağladığından unlike için delete metodu eklenmedi.
     @Transactional
     public GenericResponse<String> toggleLike(Long postId) {
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -223,6 +224,50 @@ public class PostService {
 
         Page<PostDto> dtoPage = postsPage.map(this::convertToPostDto);
         return GenericResponse.success(mapToPagedResponse(dtoPage));
+    }
+
+    // 5. Post Silme
+    @Transactional
+    public GenericResponse<String> deletePost(Long postId) {
+
+    User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+    if (postId == null) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Post ID boş olamaz.");
+    }
+
+    Post post = postRepository.findById(postId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+    if (!post.getUser().getId().equals(currentUser.getId())) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu postun sahibi siz değilsiniz.");
+    }
+    
+    postRepository.delete(post);
+
+    return GenericResponse.success("Post başarıyla silindi.");
+    }
+    
+    // 6. Yorum Silme
+    @Transactional
+    public GenericResponse<String> deleteComment(Long commentId) {
+
+    User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+    if (commentId == null) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Yorum ID boş olamaz.");
+    }
+
+    Comment comment = commentRepository.findById(commentId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.COMMENT_NOT_FOUND));
+
+    if (!comment.getUser().getId().equals(currentUser.getId())) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu yoruma ait sahibi siz değilsiniz.");
+    }
+
+    commentRepository.delete(comment);
+
+    return GenericResponse.success("Yorum başarıyla silindi.");
     }
 
     // --- DTO Dönüştürücü ---

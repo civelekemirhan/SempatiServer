@@ -30,6 +30,11 @@ public class PetController {
         return petService.updatePet(petId, request);
     }
 
+    @DeleteMapping("/{petId}")
+    public GenericResponse<String> deletePet(@PathVariable Long petId) {
+    return petService.deletePet(petId);
+    }
+
     @GetMapping("/{petId}")
     public GenericResponse<PetDto> getPetById(@PathVariable Long petId) {
         return petService.getPetById(petId);

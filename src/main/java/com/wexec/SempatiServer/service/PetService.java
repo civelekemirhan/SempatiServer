@@ -85,6 +85,24 @@ public class PetService {
         petRepository.save(pet);
         return GenericResponse.success(PetDto.fromEntity(pet));
     }
+   
+    // Pet Silme
+    @Transactional
+    public GenericResponse<String> deletePet(Long petId) {
+    
+    User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    
+    Pet pet = petRepository.findById(petId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST, "Silinecek pet bulunamadı."));
+
+    if (!pet.getOwner().getId().equals(currentUser.getId())) {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "Bu petin sahibi siz değilsiniz ve silemezsiniz.");
+    }
+
+    petRepository.delete(pet);
+
+    return GenericResponse.success("Pet başarıyla silindi.");
+}
 
     // ID ile Pet Getir (Detay Sayfası İçin)
     public GenericResponse<PetDto> getPetById(Long petId) {
