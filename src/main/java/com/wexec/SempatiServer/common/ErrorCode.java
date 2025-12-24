@@ -19,6 +19,7 @@ public enum ErrorCode {
     AUTH_INVALID_TOKEN("AUTH_005", "Geçersiz token.", HttpStatus.UNAUTHORIZED),
     AUTH_PASSWORD_MISMATCH("AUTH_006", "Şifreler uyuşmuyor.", HttpStatus.BAD_REQUEST),
     EMAIL_SEND_ERROR("MAIL_001", "E-posta gönderimi başarısız oldu.", HttpStatus.INTERNAL_SERVER_ERROR),
+    FCM_SEND_ERROR("NOTIF_001", "Bildirim gönderilemedi.", HttpStatus.INTERNAL_SERVER_ERROR),
 
     POST_NOT_FOUND("POST_001", "İlgili gönderi bulunamadı.", HttpStatus.NOT_FOUND),
     NO_MORE_POSTS("POST_002", "Tüm gönderiler gösterildi.", HttpStatus.NOT_FOUND),

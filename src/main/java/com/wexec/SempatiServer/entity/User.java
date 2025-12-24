@@ -17,7 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 @Entity
 @Table(name = "users")
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class User implements UserDetails {
 
     @Id
@@ -34,10 +34,14 @@ public class User implements UserDetails {
     private String nickname;
 
     @Column(length = 500)
-    private String bio; // YENİ: Biyografi
+    private String bio; // Biyografi
 
     @Enumerated(EnumType.STRING)
-    private ProfileIcon profileIcon; // YENİ: URL yerine Enum
+    private ProfileIcon profileIcon; // Profil İkonu (Enum)
+
+    // --- YENİ EKLENEN KRİTİK ALAN ---
+    // Android cihazın bildirim kimliği (FCM). Chat bildirimleri için şart.
+    private String fcmToken;
 
     @JsonIgnore
     private String password;
@@ -47,9 +51,11 @@ public class User implements UserDetails {
 
     private boolean enabled;
 
+    // --- İLİŞKİLER ---
+
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Pet> pets; 
-    
+    private List<Pet> pets;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonIgnore
     private List<RefreshToken> refreshTokens;
@@ -74,9 +80,13 @@ public class User implements UserDetails {
     @JsonIgnore
     private VerificationCode verificationCode;
 
+    // --- GÜVENLİK ---
+
     @Builder.Default
     @Column(nullable = false)
     private Long tokenVersion = 0L;
+
+    // --- USER DETAILS IMPL ---
 
     @Override
     @JsonIgnore
@@ -84,9 +94,28 @@ public class User implements UserDetails {
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
-    @Override public String getUsername() { return email; }
-    @Override public boolean isAccountNonExpired() { return true; }
-    @Override public boolean isAccountNonLocked() { return true; }
-    @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled() { return enabled; }
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return enabled;
+    }
 }

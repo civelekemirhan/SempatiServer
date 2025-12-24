@@ -27,4 +27,7 @@ public class ChatMessage {
     private MessageType type; // TEXT, IMAGE, AUDIO
 
     private LocalDateTime timestamp;
+
+    @Builder.Default
+    private boolean isRead = false; // Varsayılan: Okunmadı
 }
