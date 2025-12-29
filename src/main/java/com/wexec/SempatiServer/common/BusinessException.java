@@ -12,7 +12,6 @@ public class BusinessException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
-    // Nadiren özel mesaj geçmek istersen diye (Overloading)
     public BusinessException(ErrorCode errorCode, String customMessage) {
         super(customMessage);
         this.errorCode = errorCode;

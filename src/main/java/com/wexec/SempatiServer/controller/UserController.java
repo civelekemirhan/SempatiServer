@@ -58,4 +58,9 @@ public class UserController {
     public GenericResponse<String> updateFcmToken(@RequestParam String token) {
         return userService.updateFcmToken(token);
     }
+
+    @DeleteMapping("/fcm-token")
+    public GenericResponse<String> deleteFcmToken() {
+        return userService.clearFcmToken();
+    }
 }

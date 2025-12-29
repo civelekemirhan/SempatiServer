@@ -21,4 +21,6 @@ public class ChatSummaryDto {
     private String lastMessage; // Son mesajın içeriği (veya "📷 Fotoğraf")
     private MessageType type; // Mesaj tipi (TEXT, IMAGE, AUDIO)
     private LocalDateTime timestamp; // Son mesaj saati
+
+    private Long unreadCount; // Okunmamış mesaj sayısı
 }

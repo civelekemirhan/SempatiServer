@@ -10,7 +10,7 @@ import lombok.*;
 @AllArgsConstructor
 @Entity
 @Table(name = "post_likes", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "post_id"}) // Bir kullanıcı bir postu sadece 1 kere beğenebilir
+        @UniqueConstraint(columnNames = {"user_id", "post_id"})
 })
 public class PostLike {
 

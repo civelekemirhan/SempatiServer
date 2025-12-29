@@ -29,7 +29,7 @@ public class AwsImageAnalysisService implements IImageAnalysisService {
     private final AmazonRekognition rekognitionClient;
     private final AmazonS3 s3Client; // Videoyu geçici yüklemek için S3 client lazım
 
-    @Value("${aws.bucketName}")
+    @Value("${aws.s3.bucket}")
     private String bucketName;
 
     private static final List<String> ALLOWED_LABELS = List.of("Cat", "Dog", "Pet", "Animal", "Puppy", "Kitten");
@@ -56,7 +56,7 @@ public class AwsImageAnalysisService implements IImageAnalysisService {
                     .withMinConfidence(75F);
 
             DetectLabelsResult result = rekognitionClient.detectLabels(request);
-            
+
             boolean isValid = result.getLabels().stream()
                     .anyMatch(label -> ALLOWED_LABELS.contains(label.getName()));
 
@@ -65,9 +65,12 @@ public class AwsImageAnalysisService implements IImageAnalysisService {
                 throw new BusinessException(ErrorCode.IMAGE_INVALID_CONTENT);
             }
 
+        } catch (BusinessException e) {
+            throw e;
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.FILE_READ_ERROR);
         } catch (Exception e) {
+            // Sadece beklenmeyen teknik hatalar buraya düşsün
             log.error("AWS Resim Hatası: {}", e.getMessage());
             throw new BusinessException(ErrorCode.AI_SERVICE_ERROR, "AWS servisine ulaşılamıyor.");
         }
