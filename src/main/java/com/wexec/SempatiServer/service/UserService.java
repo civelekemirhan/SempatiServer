@@ -200,6 +200,18 @@ public class UserService {
         return GenericResponse.success("Bildirim tokenı güncellendi.");
     }
 
+    public GenericResponse<String> clearFcmToken() {
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        User currentUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        currentUser.setFcmToken(null);
+        userRepository.save(currentUser);
+
+        return GenericResponse.success("Bildirim tokenı temizlendi.");
+    }
+
     // Hesap Silme Metodu
     @Transactional
     public GenericResponse<String> deleteCurrentUserAccount() {

@@ -28,9 +28,8 @@ public class ChatController {
 
     // WebSocket (Sadece Text Mesajlar için)
     @MessageMapping("/chat")
-    public void processMessage(@Payload ChatMessageRequest request, Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
-        chatService.saveAndSendMessage(user.getId(), request);
+    public void processMessage(@Payload ChatMessageRequest request) {
+        chatService.saveAndSendMessage(request.getSenderId(), request);
     }
 
     // REST (Geçmiş)

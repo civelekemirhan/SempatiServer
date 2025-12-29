@@ -11,9 +11,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class FcmService {
 
-    /**
-     * Belirtilen FCM token'a (Android cihaza) bildirim gönderir.
-     */
     public void sendNotification(String token, String title, String body, String senderId) {
         if (token == null || token.isEmpty()) {
             log.warn("Kullanıcının FCM Token'ı yok, bildirim gönderilemedi.");
@@ -21,13 +18,11 @@ public class FcmService {
         }
 
         try {
-            // 1. Bildirim Görünümü
             Notification notification = Notification.builder()
                     .setTitle(title)
                     .setBody(body)
                     .build();
 
-            // 2. Mesaj Verisi (Data Payload)
             Message message = Message.builder()
                     .setToken(token)
                     .setNotification(notification)
@@ -35,12 +30,10 @@ public class FcmService {
                     .putData("click_action", "OPEN_CHAT_ACTIVITY")
                     .build();
 
-            // 3. Gönder
             String response = FirebaseMessaging.getInstance().send(message);
             log.info("FCM Bildirimi başarıyla gönderildi: " + response);
 
         } catch (Exception e) {
-            // Hata olsa bile işlemi durdurma, sadece logla
             log.error("FCM Bildirim Hatası [{}]: {}", ErrorCode.INTERNAL_SERVER_ERROR.getCode(), e.getMessage());
         }
     }

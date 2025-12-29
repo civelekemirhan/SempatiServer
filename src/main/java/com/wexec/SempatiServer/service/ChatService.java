@@ -3,10 +3,7 @@ package com.wexec.SempatiServer.service;
 import com.wexec.SempatiServer.common.BusinessException;
 import com.wexec.SempatiServer.common.ErrorCode;
 import com.wexec.SempatiServer.common.GenericResponse;
-import com.wexec.SempatiServer.dto.ChatMessageRequest;
-import com.wexec.SempatiServer.dto.ChatSummaryDto;
-import com.wexec.SempatiServer.dto.PagedResponse;
-import com.wexec.SempatiServer.dto.TypingRequest;
+import com.wexec.SempatiServer.dto.*;
 import com.wexec.SempatiServer.entity.ChatMessage;
 import com.wexec.SempatiServer.entity.MessageType;
 import com.wexec.SempatiServer.entity.User;
@@ -40,9 +37,12 @@ public class ChatService {
     private final UserRepository userRepository;
 
     // 1. MESAJ GÖNDERME (TEXT)
+    // 1. MESAJ GÖNDERME (TEXT)
+    // ChatService.java içinde bu metodu güncelle:
+
     @Transactional
     public ChatMessage saveAndSendMessage(Long senderId, ChatMessageRequest request) {
-        // Validasyon
+        // 1. Validasyon
         if (request.getContent() == null || request.getContent().trim().isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Mesaj içeriği boş olamaz.");
         }
@@ -56,21 +56,45 @@ public class ChatService {
                 .content(request.getContent())
                 .type(request.getType())
                 .timestamp(LocalDateTime.now())
-                .isRead(false) // Yeni mesaj okunmamış olarak başlar
+                .isRead(false)
                 .build();
 
-        // 1. Veritabanına Kaydet
+        // 2. Veritabanına Kaydet
         ChatMessage savedMessage = chatMessageRepository.save(message);
 
-        // 2. WebSocket ile Canlı Gönder (Uygulama açıksa anında düşer)
-        // Kanal: /user/{recipientId}/queue/messages
-        messagingTemplate.convertAndSendToUser(
-                String.valueOf(request.getRecipientId()),
-                "/queue/messages",
-                savedMessage);
+        // 3. WebSocket ile Canlı Gönder (GÜNCELLENDİ)
 
-        // 3. FCM ile Bildirim Gönder (Uygulama kapalıysa bildirim düşer)
-        sendPushNotification(senderId, request);
+        // Gönderen kişinin ismini ve resmini bulmamız lazım
+        User senderUser = userRepository.findById(senderId).orElse(null);
+
+        // Alıcıyı buluyoruz (Email adresine yollamak için)
+        User recipientUser = userRepository.findById(request.getRecipientId()).orElse(null);
+
+        if (recipientUser != null && senderUser != null) {
+
+            // DTO HAZIRLIĞI: Mesaj verisi + Gönderen Kimliği
+            SocketMessageDto socketPayload = SocketMessageDto.builder()
+                    .messageId(savedMessage.getId())
+                    .content(savedMessage.getContent())
+                    .type(savedMessage.getType())
+                    .timestamp(savedMessage.getTimestamp())
+                    // UI için kritik veriler:
+                    .senderId(senderUser.getId())
+                    .senderName(senderUser.getNickname())     // <-- İsim eklendi
+                    .senderIcon(senderUser.getProfileIcon())  // <-- Resim eklendi
+                    .build();
+
+            // WebSocket ile DTO'yu Gönder (Artık Entity gitmiyor, DTO gidiyor)
+            messagingTemplate.convertAndSendToUser(
+                    recipientUser.getEmail(),
+                    "/queue/messages",
+                    socketPayload);
+
+            System.out.println("✅ Mesaj DTO olarak yollandı: " + recipientUser.getEmail());
+
+            // 4. FCM Bildirimi (Değişmedi)
+            sendPushNotification(senderId, request);
+        }
 
         return savedMessage;
     }
@@ -130,6 +154,7 @@ public class ChatService {
                         .profileIcon(otherUser.getProfileIcon())
                         .lastMessage(msg.getType() == MessageType.IMAGE ? "📷 Fotoğraf" : msg.getContent())
                         .type(msg.getType())
+                        .unreadCount(chatMessageRepository.countByRecipientIdAndIsReadFalse(otherUserId))
                         .timestamp(msg.getTimestamp())
                         .build());
             }
