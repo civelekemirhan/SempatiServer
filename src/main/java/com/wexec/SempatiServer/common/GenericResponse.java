@@ -7,12 +7,10 @@ import lombok.Data;
 @Builder
 public class GenericResponse<T> {
 
-    // İSTEDİĞİN SADE YAPI
-    private int code; // HTTP Status (200, 400 vs.)
-    private T payload; // Başarılıysa veri buraya (Eski adı: data)
-    private ApiError error; // Hataysa detay buraya
+    private int code;
+    private T payload;
+    private ApiError error;
 
-    // Başarılı Cevap Metodu
     public static <T> GenericResponse<T> success(T payload) {
         return GenericResponse.<T>builder()
                 .code(200)
@@ -21,7 +19,6 @@ public class GenericResponse<T> {
                 .build();
     }
 
-    // Hata Cevap Metodu
     public static <T> GenericResponse<T> error(int httpStatus, ApiError error) {
         return GenericResponse.<T>builder()
                 .code(httpStatus)

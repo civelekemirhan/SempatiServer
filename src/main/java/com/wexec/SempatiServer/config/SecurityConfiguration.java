@@ -23,39 +23,43 @@ public class SecurityConfiguration {
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
-                                .cors(cors -> cors.configure(http))
-                                .csrf(AbstractHttpConfigurer::disable)
-                                .authorizeHttpRequests(auth -> auth
-                                                // Auth işlemleri (Register, Login, Refresh Token)
-                                                .requestMatchers(
-                                                                "/api/v1/auth/register",
-                                                                "/api/v1/auth/login",
-                                                                "/api/v1/auth/verify",
-                                                                "/api/v1/auth/refresh-token" // <-- YENİ EKLENDİ
-                                                ).permitAll()
+                        .cors(cors -> cors.configure(http))
+                        .csrf(AbstractHttpConfigurer::disable)
+                        .authorizeHttpRequests(auth -> auth
+                                // 1. WebSocket Endpointine İzin Ver (Handshake için şart!)
+                                .requestMatchers("/ws/**").permitAll() // <--- BURAYI EKLE
 
-                                                // Şifre Sıfırlama İşlemleri
-                                                .requestMatchers(
-                                                                "/api/v1/auth/forgot-password",
-                                                                "/api/v1/auth/verify-reset-code",
-                                                                "/api/v1/auth/reset-password")
-                                                .permitAll()
+                                // Auth işlemleri
+                                .requestMatchers(
+                                        "/api/v1/auth/register",
+                                        "/api/v1/auth/login",
+                                        "/api/v1/auth/verify",
+                                        "/api/v1/auth/refresh-token"
+                                ).permitAll()
 
-                                                // Swagger
-                                                .requestMatchers(
-                                                                "/v2/api-docs",
-                                                                "/v3/api-docs",
-                                                                "/v3/api-docs/**",
-                                                                "/swagger-resources/**",
-                                                                "/swagger-ui/**",
-                                                                "/webjars/**",
-                                                                "/swagger-ui.html")
-                                                .permitAll()
+                                // Şifre Sıfırlama İşlemleri
+                                .requestMatchers(
+                                        "/api/v1/auth/forgot-password",
+                                        "/api/v1/auth/verify-reset-code",
+                                        "/api/v1/auth/reset-password")
+                                .permitAll()
 
-                                                .anyRequest().authenticated())
-                                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authenticationProvider(authenticationProvider)
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                                // Swagger
+                                .requestMatchers(
+                                        "/v2/api-docs",
+                                        "/v3/api-docs",
+                                        "/v3/api-docs/**",
+                                        "/swagger-resources/**",
+                                        "/swagger-ui/**",
+                                        "/webjars/**",
+                                        "/swagger-ui.html")
+                                .permitAll()
+
+                                // Geri kalan her şey için Auth zorunlu
+                                .anyRequest().authenticated())
+                        .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        .authenticationProvider(authenticationProvider)
+                        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
                 return http.build();
         }

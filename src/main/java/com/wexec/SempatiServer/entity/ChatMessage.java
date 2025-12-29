@@ -16,15 +16,21 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Entity'de chatId String olarak tanımlı.
     private String chatId;
+
     private Long senderId;
+
     private Long recipientId;
 
     @Column(nullable = false)
-    private String content; // Yazı ise metin, Medya ise S3 Linki (URL) burada duracak.
+    private String content;
 
     @Enumerated(EnumType.STRING)
-    private MessageType type; // TEXT, IMAGE, AUDIO
+    private MessageType type;
 
     private LocalDateTime timestamp;
+
+    @Builder.Default
+    private boolean isRead = false;
 }

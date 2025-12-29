@@ -255,7 +255,19 @@ public class PostService {
         return GenericResponse.success("Post başarıyla silindi.");
     }
 
-    // 6. Yorum Silme
+    // 6. Tek bir Post Getirme
+    public GenericResponse<PostDto> getPostById(Long postId) {
+        if (postId == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Post ID boş olamaz.");
+        }
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        return GenericResponse.success(convertToPostDto(post));
+    }
+
+    // 7. Yorum Silme
     @Transactional
     public GenericResponse<String> deleteComment(Long commentId) {
 

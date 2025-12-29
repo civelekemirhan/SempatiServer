@@ -76,6 +76,11 @@ public class PostController {
         return postService.deletePost(postId);
     }
 
+    @GetMapping("/{postId}")
+    public GenericResponse<PostDto> getPostById(@PathVariable Long postId) {
+        return postService.getPostById(postId);
+    }
+
     @DeleteMapping("/comments/{commentId}")
     public GenericResponse<String> deleteComment(@PathVariable Long commentId) {
         return postService.deleteComment(commentId);
