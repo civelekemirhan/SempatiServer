@@ -11,14 +11,18 @@ import com.wexec.SempatiServer.dto.UserUpdateRequest;
 import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.entity.ProfileIcon;
 import com.wexec.SempatiServer.entity.User;
+import com.wexec.SempatiServer.entity.UserBlock;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.wexec.SempatiServer.repository.PostRepository;
+import com.wexec.SempatiServer.repository.UserBlockRepository;
 import com.wexec.SempatiServer.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,6 +33,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserBlockRepository userBlockRepository;
 
     // --- YENİ EKLENENLER ---
     private final PostRepository postRepository; // Veriyi çekmek için
@@ -221,6 +226,47 @@ public class UserService {
         userRepository.delete(currentUser);
 
         return GenericResponse.success("Hesabınız ve tüm verileriniz başarıyla silinmiştir.");
+    }
+
+    // Kullanıcı Engelle
+    @Transactional
+    public GenericResponse<String> blockUser(Long userIdToBlock) {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (currentUser.getId().equals(userIdToBlock)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Kendinizi engelleyemezsiniz.");
+        }
+
+        // Zaten engelli mi?
+        if (userBlockRepository.existsByBlockerIdAndBlockedId(currentUser.getId(), userIdToBlock)) {
+            return GenericResponse.success("Bu kullanıcı zaten engelli.");
+        }
+
+        User userToBlock = userRepository.findById(userIdToBlock)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        UserBlock block = UserBlock.builder()
+                .blocker(currentUser)
+                .blocked(userToBlock)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        userBlockRepository.save(block);
+
+        return GenericResponse.success("Kullanıcı engellendi.");
+    }
+
+    // Engeli Kaldır
+    @Transactional
+    public GenericResponse<String> unblockUser(Long userIdToUnblock) {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        UserBlock block = userBlockRepository.findByBlockerIdAndBlockedId(currentUser.getId(), userIdToUnblock)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST, "Engel kaydı bulunamadı."));
+
+        userBlockRepository.delete(block);
+
+        return GenericResponse.success("Kullanıcı engeli kaldırıldı.");
     }
 
 }
