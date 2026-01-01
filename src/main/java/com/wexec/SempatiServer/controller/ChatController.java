@@ -61,11 +61,11 @@ public class ChatController {
 
     // --- YENİ: Toplam Okunmamış Mesaj Sayısı ---
     // Alt navigasyon barında "Chat (3)" gibi göstermek için.
-
     @GetMapping("/api/v1/chat/unread/count")
     public GenericResponse<Long> getTotalUnreadCount() {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long count = chatService.getUnreadMessageCount(currentUser.getId());
+
         return GenericResponse.success(count);
     }
 
