@@ -54,6 +54,16 @@ public class UserController {
         return userService.deleteCurrentUserAccount();
     }
 
+    @PostMapping("/{userId}/block")
+    public GenericResponse<String> blockUser(@PathVariable Long userId) {
+        return userService.blockUser(userId);
+    }
+
+    @DeleteMapping("/{userId}/block")
+    public GenericResponse<String> unblockUser(@PathVariable Long userId) {
+        return userService.unblockUser(userId);
+    }
+
     @PatchMapping("/fcm-token")
     public GenericResponse<String> updateFcmToken(@RequestParam String token) {
         return userService.updateFcmToken(token);

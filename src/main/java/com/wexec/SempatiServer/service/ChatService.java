@@ -8,12 +8,13 @@ import com.wexec.SempatiServer.entity.ChatMessage;
 import com.wexec.SempatiServer.entity.MessageType;
 import com.wexec.SempatiServer.entity.User;
 import com.wexec.SempatiServer.repository.ChatMessageRepository;
+import com.wexec.SempatiServer.repository.UserBlockRepository;
 import com.wexec.SempatiServer.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @SuppressWarnings("null")
 public class ChatService {
 
@@ -36,18 +38,57 @@ public class ChatService {
     private final S3Service s3Service;
     private final FcmService fcmService;
     private final UserRepository userRepository;
+    private final UserBlockRepository userBlockRepository;
 
-    // 1. MESAJ GÖNDERME (TEXT)
-    // 1. MESAJ GÖNDERME (TEXT)
-    // ChatService.java içinde bu metodu güncelle:
+    // Bu metot WebSocket Controller tarafından çağrılır (Email ile)
+    @Transactional
+    public void saveAndSendMessage(ChatMessageRequest request, String senderEmail) {
+        User sender = userRepository.findByEmail(senderEmail)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
+        // Ana işlemi çağır
+        processAndSendMessage(sender.getId(), request);
+    }
+
+    // Bu metot direkt ID ile çağrılır (Medya yükleme veya REST API)
     @Transactional
     public ChatMessage saveAndSendMessage(Long senderId, ChatMessageRequest request) {
+        return processAndSendMessage(senderId, request);
+    }
+
+    // --- ÇEKİRDEK MANTIK (Tüm kontroller burada) ---
+    private ChatMessage processAndSendMessage(Long senderId, ChatMessageRequest request) {
+
         // 1. Validasyon
         if (request.getContent() == null || request.getContent().trim().isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Mesaj içeriği boş olamaz.");
         }
 
+        // 2. Kullanıcıları Bul
+        User senderUser = userRepository.findById(senderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        User recipientUser = userRepository.findById(request.getRecipientId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        // 3. ENGELLEME KONTROLÜ (BLOCK CHECK) 🛑
+        // Alıcı beni engellemiş mi?
+        boolean isBlocked = userBlockRepository.existsByBlockerIdAndBlockedId(recipientUser.getId(),
+                senderUser.getId());
+        if (isBlocked) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Bu kullanıcıya mesaj gönderemezsiniz (Engellendiniz).");
+        }
+
+        // Ben onu engellemiş miyim?
+        boolean iBlockedThem = userBlockRepository.existsByBlockerIdAndBlockedId(senderUser.getId(),
+                recipientUser.getId());
+        if (iBlockedThem) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Engellediğiniz bir kullanıcıya mesaj atamazsınız. Önce engeli kaldırın.");
+        }
+
+        // 4. Veritabanına Hazırlık ve Kayıt
         String chatId = getChatId(senderId, request.getRecipientId());
 
         ChatMessage message = ChatMessage.builder()
@@ -60,64 +101,44 @@ public class ChatService {
                 .isRead(false)
                 .build();
 
-        // 2. Veritabanına Kaydet
         ChatMessage savedMessage = chatMessageRepository.save(message);
 
-        // 3. WebSocket ile Canlı Gönder (GÜNCELLENDİ)
+        // 5. WebSocket ile Canlı Gönder 🚀
+        SocketMessageDto socketPayload = SocketMessageDto.builder()
+                .messageId(savedMessage.getId())
+                .content(savedMessage.getContent())
+                .type(savedMessage.getType())
+                .timestamp(savedMessage.getTimestamp())
+                .senderId(senderUser.getId())
+                .senderName(senderUser.getNickname())
+                .senderIcon(senderUser.getProfileIcon())
+                .build();
 
-        // Gönderen kişinin ismini ve resmini bulmamız lazım
-        User senderUser = userRepository.findById(senderId).orElse(null);
+        messagingTemplate.convertAndSendToUser(
+                recipientUser.getEmail(),
+                "/queue/messages",
+                socketPayload);
 
-        // Alıcıyı buluyoruz (Email adresine yollamak için)
-        User recipientUser = userRepository.findById(request.getRecipientId()).orElse(null);
+        log.info("✅ Mesaj yollandı: {} -> {}", senderUser.getEmail(), recipientUser.getEmail());
 
-        if (recipientUser != null && senderUser != null) {
-
-            // DTO HAZIRLIĞI: Mesaj verisi + Gönderen Kimliği
-            SocketMessageDto socketPayload = SocketMessageDto.builder()
-                    .messageId(savedMessage.getId())
-                    .content(savedMessage.getContent())
-                    .type(savedMessage.getType())
-                    .timestamp(savedMessage.getTimestamp())
-                    // UI için kritik veriler:
-                    .senderId(senderUser.getId())
-                    .senderName(senderUser.getNickname()) // <-- İsim eklendi
-                    .senderIcon(senderUser.getProfileIcon()) // <-- Resim eklendi
-                    .build();
-
-            // WebSocket ile DTO'yu Gönder (Artık Entity gitmiyor, DTO gidiyor)
-            messagingTemplate.convertAndSendToUser(
-                    recipientUser.getEmail(),
-                    "/queue/messages",
-                    socketPayload);
-
-            System.out.println("✅ Mesaj DTO olarak yollandı: " + recipientUser.getEmail());
-
-            // 4. FCM Bildirimi (Değişmedi)
-            sendPushNotification(senderId, request);
-        }
+        // 6. FCM Bildirimi
+        sendPushNotification(senderUser, recipientUser, request);
 
         return savedMessage;
     }
 
     // Yardımcı: Bildirim Gönderimi
-    private void sendPushNotification(Long senderId, ChatMessageRequest request) {
-        User sender = userRepository.findById(senderId).orElse(null);
-        User recipient = userRepository.findById(request.getRecipientId()).orElse(null);
-
-        if (sender != null && recipient != null && recipient.getFcmToken() != null) {
+    private void sendPushNotification(User sender, User recipient, ChatMessageRequest request) {
+        if (recipient.getFcmToken() != null) {
             String title = sender.getNickname();
             String body = request.getType() == MessageType.IMAGE ? "📷 Bir fotoğraf gönderdi" : request.getContent();
-
-            fcmService.sendNotification(recipient.getFcmToken(), title, body, String.valueOf(senderId));
+            fcmService.sendNotification(recipient.getFcmToken(), title, body, String.valueOf(sender.getId()));
         }
     }
 
-    // 2. MEDYA GÖNDERME (IMAGE/AUDIO)
     @Transactional
     public GenericResponse<ChatMessage> uploadAndSendMedia(Long senderId, Long recipientId, MultipartFile file,
             MessageType type) {
-
         if (file.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Gönderilecek dosya boş olamaz.");
         }
@@ -125,21 +146,19 @@ public class ChatService {
         // 1. Dosyayı S3'e yükle
         String mediaUrl = s3Service.uploadFile(file);
 
-        // 2. Mesaj isteği hazırla (İçerik = URL)
+        // 2. Mesaj isteği hazırla
         ChatMessageRequest request = new ChatMessageRequest();
         request.setRecipientId(recipientId);
         request.setContent(mediaUrl);
         request.setType(type);
 
-        // 3. Kaydet, Socket'ten yolla, Bildirim at
-        ChatMessage sentMessage = saveAndSendMessage(senderId, request);
+        // 3. Ana metodu çağır (Engelleme kontrolü orada yapılıyor)
+        ChatMessage sentMessage = processAndSendMessage(senderId, request);
 
         return GenericResponse.success(sentMessage);
     }
 
-    // 3. LİSTELEME İŞLEMLERİ
-
-    // Son Sohbetler Listesi (WhatsApp Ana Ekranı)
+    // Son Sohbetler Listesi
     public GenericResponse<List<ChatSummaryDto>> getRecentChats(Long currentUserId) {
         List<ChatMessage> lastMessages = chatMessageRepository.findRecentChats(currentUserId);
         List<ChatSummaryDto> summaries = new ArrayList<>();
@@ -165,58 +184,40 @@ public class ChatService {
 
     public GenericResponse<PagedResponse<ChatMessage>> getChatHistory(Long userId1, Long userId2, int page, int size) {
         String chatId = getChatId(userId1, userId2);
-
-        // En yeni mesajlar önce (Desc)
         Pageable pageable = PageRequest.of(page, size);
-
         Page<ChatMessage> historyPage = chatMessageRepository.findByChatIdOrderByTimestampDesc(chatId, pageable);
-
-        // Yardımcı metod ile dönüştür
         return GenericResponse.success(mapToPagedResponse(historyPage));
     }
 
-    // 4. ETKİLEŞİM İŞLEMLERİ
-
-    // Mesajları Okundu İşaretle
     @Transactional
     public void markMessagesAsRead(Long currentUserId, Long otherUserId) {
-        // "Diğer kişiden bana gelen ve okunmamış olanları güncelle"
         chatMessageRepository.markMessagesAsRead(otherUserId, currentUserId);
     }
 
-    // Toplam Okunmamış Mesaj Sayısı (Badge için)
     public Long getUnreadMessageCount(Long currentUserId) {
         return chatMessageRepository.countByRecipientIdAndIsReadFalse(currentUserId);
     }
 
-    // Mesaj Silme
     @Transactional
     public void deleteMessage(Long currentUserId, Long messageId) {
         ChatMessage message = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST, "Mesaj bulunamadı."));
 
-        // Güvenlik: Sadece kendi mesajını silebilirsin
         if (!message.getSenderId().equals(currentUserId)) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "Sadece kendi mesajlarınızı silebilirsiniz.");
         }
-
         chatMessageRepository.delete(message);
     }
 
-    // Sohbet Silme
-    // DÜZELTME 1: Parametre 'Long' değil 'String' olmalı (Entity ve Repo ile uyum
-    // için)
+    // Sohbet Silme (Entity ve Repo ile uyumlu String chatId)
     @Transactional
     public GenericResponse<String> deleteChat(String chatId) {
-
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        // 1. Sohbetin varlığını kontrol et
         ChatMessage messageSample = chatMessageRepository.findFirstByChatId(chatId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST, "Sohbet bulunamadı."));
 
-        // 2. GÜVENLİK KONTROLÜ
-        // DÜZELTME 2: getReceiverId() değil, getRecipientId() kullanılmalı.
+        // Güvenlik: Katılımcı mıyım?
         boolean isParticipant = messageSample.getSenderId().equals(currentUser.getId()) ||
                 messageSample.getRecipientId().equals(currentUser.getId());
 
@@ -224,19 +225,16 @@ public class ChatService {
             throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS, "Bu sohbeti silme yetkiniz yok.");
         }
 
-        // 3. Sohbeti sil
         chatMessageRepository.deleteAllByChatId(chatId);
-
         return GenericResponse.success("Sohbet başarıyla silindi.");
     }
 
-    // "Yazıyor..." Bildirimi (Veritabanına yazmaz, direkt iletir)
+    // "Yazıyor..." Bildirimi
     public void sendTypingNotification(Long senderId, TypingRequest request) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("senderId", senderId);
         payload.put("isTyping", request.isTyping());
 
-        // Kanal: /user/{recipientId}/queue/typing
         messagingTemplate.convertAndSendToUser(
                 String.valueOf(request.getRecipientId()),
                 "/queue/typing",
