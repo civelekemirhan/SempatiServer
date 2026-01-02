@@ -4,6 +4,7 @@ import com.wexec.SempatiServer.entity.UserBlock;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
 
@@ -12,4 +13,8 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
 
     // Engeli kaldırmak için kaydı bul
     Optional<UserBlock> findByBlockerIdAndBlockedId(Long blockerId, Long blockedId);
+
+    List<UserBlock> findAllByBlockerId(Long blockerId);
+
+
 }

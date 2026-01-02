@@ -3,6 +3,7 @@ package com.wexec.SempatiServer.controller;
 import com.wexec.SempatiServer.common.GenericResponse;
 import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
+import com.wexec.SempatiServer.dto.UserSummaryDto;
 import com.wexec.SempatiServer.dto.UserUpdateRequest;
 import com.wexec.SempatiServer.dto.ChangePasswordRequest;
 import com.wexec.SempatiServer.entity.ProfileIcon;
@@ -62,6 +63,11 @@ public class UserController {
     @DeleteMapping("/{userId}/block")
     public GenericResponse<String> unblockUser(@PathVariable Long userId) {
         return userService.unblockUser(userId);
+    }
+
+    @GetMapping("/blocked")
+    public GenericResponse<List<UserSummaryDto>> getBlockedUsers() {
+        return userService.getBlockedUsers();
     }
 
     @PatchMapping("/fcm-token")
