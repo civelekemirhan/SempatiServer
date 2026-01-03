@@ -7,6 +7,7 @@ import com.wexec.SempatiServer.dto.ChangePasswordRequest;
 import com.wexec.SempatiServer.dto.PetDto;
 import com.wexec.SempatiServer.dto.PostDto;
 import com.wexec.SempatiServer.dto.UserProfileResponse;
+import com.wexec.SempatiServer.dto.UserSummaryDto;
 import com.wexec.SempatiServer.dto.UserUpdateRequest;
 import com.wexec.SempatiServer.entity.Post;
 import com.wexec.SempatiServer.entity.ProfileIcon;
@@ -267,6 +268,19 @@ public class UserService {
         userBlockRepository.delete(block);
 
         return GenericResponse.success("Kullanıcı engeli kaldırıldı.");
+    }
+
+    @Transactional(readOnly = true)
+    public GenericResponse<List<UserSummaryDto>> getBlockedUsers() {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        List<UserBlock> blockedRecords = userBlockRepository.findAllByBlockerId(currentUser.getId());
+
+        List<UserSummaryDto> blockedUsers = blockedRecords.stream()
+            .map(blockRecord -> UserSummaryDto.fromEntity(blockRecord.getBlocked()))
+            .collect(Collectors.toList());
+
+        return GenericResponse.success(blockedUsers);
     }
 
 }
